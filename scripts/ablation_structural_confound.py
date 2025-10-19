@@ -386,7 +386,7 @@ def run_ablation_study(preset: str = 'local'):
     print("\nThis analysis should be included in your methods section:")
     print("  'To test for structural confounds, we performed ablation")
     print("   analysis comparing operator performance on prompts beginning")
-    print("   with 'The' versus other structures. Results showed...")")
+    print("   with 'The' versus other structures. Results showed...'")
 
 
 def main():

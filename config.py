@@ -85,13 +85,14 @@ class QuantumConfig:
 
         Memory estimate: ~1.5GB peak
         Training time: ~10-20 min on M1
+        Note: MPS doesn't support complex types, so we use CPU
         """
         return cls(
             quantum_dim=2000,
             learning_rate=0.001,
             epochs=100,
             batch_size=10,
-            device='mps'  # Apple Silicon GPU
+            device='cpu'  # MPS doesn't support complex numbers
         )
 
     @classmethod
