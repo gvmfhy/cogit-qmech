@@ -160,6 +160,33 @@ python experiments/sentiment/test_reversibility.py --preset tiny
 
 ---
 
+## Step 7: Ablation Study - Test for Confounds (1 minute)
+
+**Optional but recommended for publication rigor**
+
+```bash
+python scripts/ablation_structural_confound.py --preset tiny
+```
+
+**What happens**:
+1. Partitions stimuli by syntactic structure ("The" vs non-"The")
+2. Tests if operator performance differs between groups
+3. Validates that operators learn semantics, not syntax
+
+**Expected output**:
+```
+[Test 1: Positive → Negative Transformation Quality]
+  Pos(The) → Neg: 0.6234 ± 0.0421
+  Pos(Non-The) → Neg: 0.6189 ± 0.0387
+  Difference: 0.0045
+  ✅ No structural confound!
+     Operator learns semantic sentiment, not syntax.
+```
+
+**Why this matters**: Shows your results aren't driven by superficial patterns.
+
+---
+
 ## Complete Pipeline (One Command)
 
 Run all phases sequentially:
