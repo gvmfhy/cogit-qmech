@@ -132,7 +132,8 @@ Validates round-trip fidelity: state → U → U† → state'
 
 ## Research Team
 
-**Research by**: Austin Morrissey
+**Princple Investigator:** Bryce-allen Bagley, 
+**Mentee**: Austin Morrissey
 **Implementation**: Claude Sonnet 4.5
 
 ## Related Work
@@ -148,7 +149,7 @@ If you use this work, please cite both the quantum and classical versions:
 
 ```
 @software{cogit_qmech_2025,
-  author = {Morrissey, Austin},
+  author = {Morrissey, Austin,  Bagley, Bryce-Allen},
   title = {Cogit-QMech: Quantum Cognitive Operators for Neural Network Manipulation},
   year = {2025},
   note = {Extends project-cogit-framework with quantum mechanical foundations}
