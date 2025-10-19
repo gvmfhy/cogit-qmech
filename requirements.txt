@@ -1,0 +1,17 @@
+# Core dependencies for Cogit-QMech
+# Quantum cognitive operators using unitary transformations
+
+# Deep learning framework (with complex number support)
+torch>=2.0.0
+
+# TransformerLens for clean activation extraction
+transformer-lens>=1.0.0
+
+# Numerical operations
+numpy>=1.24.0
+
+# JSON handling (built-in, but specifying for compatibility)
+# No extra package needed
+
+# For reproducibility
+# All experiments use seed 42

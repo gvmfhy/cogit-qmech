@@ -1,0 +1,17 @@
+# Optional quantum ML libraries for advanced operations
+# Install with: pip install -r requirements.quantum.txt
+
+# PennyLane for quantum circuits and unitary constraints
+pennylane>=0.30.0
+
+# Qiskit for quantum algorithm primitives (optional)
+# qiskit>=0.40.0
+
+# Scipy for advanced linear algebra (SVD, matrix functions)
+scipy>=1.10.0
+
+# Matplotlib for visualizing complex amplitudes
+matplotlib>=3.7.0
+
+# Seaborn for better plots
+seaborn>=0.12.0
