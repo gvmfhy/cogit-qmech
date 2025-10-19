@@ -9,7 +9,7 @@ import numpy as np
 from typing import List, Tuple, Optional
 from pathlib import Path
 
-from quantum_utils import normalize_state, quantum_fidelity
+from src.quantum_utils import normalize_state, quantum_fidelity
 
 
 class QuantumStateEncoder:

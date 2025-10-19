@@ -8,7 +8,7 @@ import torch
 import numpy as np
 from typing import Optional, Tuple
 
-from quantum_utils import quantum_fidelity, normalize_state
+from src.quantum_utils import quantum_fidelity, normalize_state
 
 
 class QuantumStateDecoder:

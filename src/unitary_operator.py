@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 from typing import Optional, Tuple
 
-from quantum_utils import verify_unitary, cayley_transform, inverse_cayley_transform
+from src.quantum_utils import verify_unitary, cayley_transform, inverse_cayley_transform
 
 
 class UnitaryLayer(nn.Module):

@@ -152,7 +152,7 @@ class UnitaryOperatorTrainer:
 
         # Learning rate scheduler
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, patience=20, factor=0.5, verbose=True
+            optimizer, patience=20, factor=0.5
         )
 
         # Loss function
