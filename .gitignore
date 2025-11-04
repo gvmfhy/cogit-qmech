@@ -34,6 +34,7 @@ env/
 data/
 models/
 # results/ - NOW TRACKED IN GIT (small JSON files for reproducibility)
+# prompts/ - TRACKED IN GIT (critical experimental inputs!)
 
 # Keep directory structure but ignore contents
 !data/.gitkeep

@@ -75,7 +75,12 @@ class QuantumDataCollector:
 
     def load_prompts(self):
         """Load diverse prompts from file or generate new ones"""
-        prompt_file = ROOT / "data" / "sentiment_quantum" / "diverse_prompts_50.json"
+        # Try prompts/ directory first (version controlled)
+        prompt_file = ROOT / "prompts" / "diverse_prompts_50.json"
+
+        # Fallback to data/ directory (legacy location)
+        if not prompt_file.exists():
+            prompt_file = ROOT / "data" / "sentiment_quantum" / "diverse_prompts_50.json"
 
         if prompt_file.exists():
             print(f"\n[Loading Prompts from {prompt_file.name}]")
