@@ -244,3 +244,95 @@ Each phase updates this file. Phase 2 checks: "Does my input match Phase 1 times
 ---
 
 **The mistake on 2025-11-04:** Restarted Phase 2, throwing away 98.9% fidelity models without asking. This guide ensures it never happens again.
+
+---
+
+## Performance Monitoring & Timing
+
+### Why Track Timing
+
+**Critical for:**
+1. Cost estimation (GPU costs $/hour)
+2. Diagnosing performance issues
+3. Comparing model scales (7B vs 70B)
+4. Identifying bottlenecks
+
+### Required Timing Data
+
+**Track for each phase:**
+```
+- Start time (timestamp)
+- End time (timestamp)
+- Duration (minutes)
+- Hardware (CPU/GPU, model name)
+- Key metrics (states collected, fidelity achieved, etc.)
+```
+
+### How to Track
+
+**Add to each phase script:**
+
+```python
+import time
+from datetime import datetime
+
+start_time = time.time()
+start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+print(f"[Phase N started at {start_timestamp}]")
+
+# ... do work ...
+
+end_time = time.time()
+duration_min = (end_time - start_time) / 60
+
+print(f"\n[Phase N completed in {duration_min:.1f} minutes]")
+
+# Save to results
+timing_data = {
+    'start': start_timestamp,
+    'duration_minutes': duration_min,
+    'hardware': get_hardware_info()
+}
+```
+
+### Performance Baseline: Qwen2.5-7B on RunPod RTX 5090
+
+**Measured on 2025-11-04:**
+
+| Phase | Task | Duration | Hardware | Notes |
+|-------|------|----------|----------|-------|
+| 1 | Data collection (50 prompts) | ~1 min | CPU | Would be faster on GPU |
+| 2 | Train 2 operators (100 epochs each) | ~11 min | RTX 5090 GPU | 174M params each |
+| 3 | Test interventions | ~15 min | CPU | Multiple inference passes |
+| 4 | Reversibility test | ~2 min | CPU | |
+| **Total** | Full pipeline | **~29 min** | Mixed | **$0.43 @ $0.89/hr** |
+
+**Comparison to GPT-2 (124M) on M1 Mac:**
+- Phase 1-4: ~30 min (estimated)
+- Qwen2.5-7B is 60x larger but takes similar time due to better GPU
+
+### Bottleneck Analysis
+
+**Slow**: Phase 3 intervention testing
+- **Why**: CPU inference on 7B model
+- **Fix**: Move inference to GPU (requires TransformerLens GPU support)
+
+**Fast**: Phase 2 training
+- **Why**: GPU-accelerated, well-parallelized
+
+**Acceptable**: Phase 1 data collection
+- **Why**: One-time cost, CPU is fine
+
+### Cost Tracking
+
+**Always calculate:**
+```
+Cost = (Duration in hours) × (Hardware $/hr)
+
+Example:
+29 min = 0.48 hr
+0.48 hr × $0.89/hr = $0.43 per full run
+```
+
+**Document in EXPERIMENT_LOG.md after each run.**
