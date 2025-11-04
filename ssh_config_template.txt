@@ -1,0 +1,69 @@
+# SSH Config Template for Remote GPU Development
+# Add this to your ~/.ssh/config file
+# 
+# Edit the placeholder values:
+#   <DIGITALOCEAN_IP> - Your DigitalOcean Droplet IP
+#   <RUNPOD_IP> - Your RunPod instance IP  
+#   <RUNPOD_PORT> - RunPod SSH port (changes on restart!)
+
+# =============================================================================
+# DigitalOcean GPU Droplet (Recommended Primary)
+# =============================================================================
+Host digitalocean-gpu
+    HostName <DIGITALOCEAN_IP>
+    Port 22
+    User root
+    IdentityFile ~/.ssh/id_ed25519
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    # Compression speeds up file transfers
+    Compression yes
+    # Keep connection alive for long-running tasks
+    TCPKeepAlive yes
+
+# =============================================================================
+# RunPod GPU Instance (Secondary - Use $20 Credits)
+# =============================================================================
+Host runpod-gpu
+    HostName <RUNPOD_IP>
+    Port <RUNPOD_PORT>
+    User root
+    IdentityFile ~/.ssh/id_ed25519
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    Compression yes
+    TCPKeepAlive yes
+    # Note: Update Port when pod restarts!
+
+# =============================================================================
+# Usage Examples
+# =============================================================================
+# 
+# SSH into instances:
+#   ssh digitalocean-gpu
+#   ssh runpod-gpu
+#
+# Sync project (using sync_to_remote.sh):
+#   ./sync_to_remote.sh push digitalocean <IP>
+#   ./sync_to_remote.sh push runpod <IP> <PORT>
+#
+# Connect Cursor IDE:
+#   Cmd+Shift+P → "Remote-SSH: Connect to Host"
+#   Select: digitalocean-gpu or runpod-gpu
+#
+# =============================================================================
+# Quick Setup Commands
+# =============================================================================
+#
+# 1. Generate SSH key (if you don't have one):
+#    ssh-keygen -t ed25519 -C "your_email@example.com"
+#
+# 2. Copy this template to SSH config:
+#    cat ssh_config_template.txt >> ~/.ssh/config
+#
+# 3. Edit ~/.ssh/config with your actual IPs:
+#    code ~/.ssh/config  # or nano ~/.ssh/config
+#
+# 4. Test connection:
+#    ssh digitalocean-gpu
+#

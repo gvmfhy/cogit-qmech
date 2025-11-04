@@ -1,192 +1,257 @@
-# Remote GPU Setup Guide
+# Remote GPU Development Setup for Cogit-QMech
 
-Complete guide for setting up RunPod cloud GPU for Cogit-QMech experiments.
+> ⚠️ **Status: Untested** - This setup was created to enable Mac → GPU workflow. The documentation is complete but pending validation on actual cloud GPU instances.
 
----
+This guide helps you overcome your M1 MacBook's computational bottleneck by setting up remote GPU development using **DigitalOcean** (primary, easiest) or **RunPod** (secondary, use $20 credits).
 
-## Step 1: Create RunPod Account (5 min)
-
-1. Go to https://runpod.io
-2. Sign up (Google/GitHub OAuth recommended)
-3. Add payment method (minimum $10 credit)
-4. **Add your SSH public key**:
-   - Go to Settings → SSH Keys
-   - Click "Add SSH Key"
-   - Paste this key:
-   ```
-   ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILZfd4VLv6xptdZPKK4ITmiy6bJgywTcn5nizG/c0qBe austinmorrissey@Austins-MacBook-Pro.local
-   ```
-   - Name it: "MacBook Pro M1"
+**Quick Decision Guide**:
+- **Want it to just work?** → DigitalOcean (public IP included, zero PTY issues)
+- **Have $20 RunPod credits?** → Follow RunPod section with public IP setup
+- **Both?** → Set up DigitalOcean first, then RunPod for experiments
 
 ---
 
-## Step 2: Deploy GPU Pod (5 min)
+## Table of Contents
 
-1. Go to "Pods" → "Deploy"
-2. **Filter GPUs**:
-   - RTX A4000 (24GB VRAM) - ~$0.40/hr
-   - RTX 4090 (24GB VRAM) - ~$0.50/hr
-   - (Llama 7B needs ~14GB, these have headroom)
-
-3. **Select Template**: "RunPod PyTorch 2.4" or "RunPod PyTorch"
-
-4. **Configure Pod**:
-   - Container Disk: 50GB
-   - Volume: 50GB (persistent storage)
-   - Expose TCP ports: 22 (SSH)
-   - **Important**: Check "Expose HTTP Ports" for port 22
-
-5. Click "Deploy On-Demand"
-
-6. **Save connection details**:
-   - SSH Command will look like: `ssh root@X.X.X.X -p XXXXX`
-   - Note the IP and port number
+1. [DigitalOcean Setup (Recommended)](#digitalocean-setup)
+2. [RunPod Setup (Use $20 Credits)](#runpod-setup)
+3. [Using Claude Code & Cursor](#using-claude-code--cursor)
+4. [Project Sync & Workflow](#project-sync--workflow)
+5. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Step 3: Configure SSH on Your Mac (2 min)
+## DigitalOcean Setup
 
-Run this command to add RunPod to your SSH config:
+### Why DigitalOcean?
+- Public IP included (zero PTY/SSH issues)
+- Works with Claude Code out-of-the-box
+- Cursor Remote-SSH fully supported
+- ~20% more expensive but worth it for reliability
 
+### Quick Setup (15 min total)
+
+**1. Create GPU Droplet** (5 min):
+- Sign up at [DigitalOcean](https://www.digitalocean.com/)
+- Create→ Droplets → GPU Droplet
+- OS: Ubuntu 22.04 LTS
+- Add your SSH key (or generate: `ssh-keygen -t ed25519`)
+- Note the IP address after creation
+
+**2. Initial Setup** (5 min):
 ```bash
+# From Mac: SSH into droplet
+ssh root@<DROPLET_IP>
+
+# Update & install essentials
+apt update && apt install -y git tmux python3-pip python3-venv nvidia-utils-535
+
+# Verify GPU
+nvidia-smi
+
+# Install PyTorch with CUDA
+pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+```
+
+**3. Install Claude Code** (2 min):
+```bash
+# On the Droplet
+curl -fsSL https://claude.ai/install.sh | sh
+claude --version
+```
+
+**4. Sync & Setup Project** (3 min):
+```bash
+# From Mac: sync project
+rsync -avz --exclude '.git' ~/cogit-qmech/ root@<DROPLET_IP>:~/cogit-qmech/
+
+# On Droplet: setup venv
+cd ~/cogit-qmech
+python3 -m venv .venv
+source .venv/bin/activate
+pip install transformer-lens matplotlib numpy torch
+```
+
+Done! Now see [Using Claude Code & Cursor](#using-claude-code--cursor).
+
+---
+
+## RunPod Setup
+
+### Important: Solving the PTY Issue
+
+Your previous RunPod attempts failed because **community cloud instances lack PTY support**. Solution: **Use public IP instances**.
+
+### Quick Setup with Public IP (15 min)
+
+**1. Deploy with Public IP** (5 min):
+- Login to [RunPod](https://www.runpod.io/)
+- **CRITICAL**: Select **"Public IP"** filter BEFORE deploying
+- Choose **Secure Cloud** tier (adds ~$0.27/hr for public IP)
+- GPU: RTX 4090 (~$0.61/hr total)
+- Template: "RunPod PyTorch"
+- Add SSH key to account (Settings → SSH Keys)
+
+**2. Get SSH Command** (2 min):
+- Pods → Your Pod → Connect → SSH tab
+- Copy command: `ssh root@X.X.X.X -p XXXXX -i ~/.ssh/id_ed25519`
+
+**3. Add to SSH Config** (3 min):
+```bash
+# Edit ~/.ssh/config
 cat >> ~/.ssh/config << 'EOF'
 
-# RunPod GPU Instance
+# RunPod GPU with Public IP
 Host runpod-gpu
-    HostName <REPLACE_WITH_POD_IP>
-    Port <REPLACE_WITH_POD_PORT>
+    HostName <IP_FROM_RUNPOD>
+    Port <PORT_FROM_RUNPOD>
     User root
     IdentityFile ~/.ssh/id_ed25519
     ServerAliveInterval 60
-    ServerAliveCountMax 3
 EOF
 ```
 
-**Replace**:
-- `<REPLACE_WITH_POD_IP>` with the IP from RunPod (e.g., `45.67.89.123`)
-- `<REPLACE_WITH_POD_PORT>` with the port (e.g., `12345`)
-
-**Test connection**:
+**4. Install & Sync** (5 min):
 ```bash
+# SSH in
 ssh runpod-gpu
+
+# Install Claude Code
+curl -fsSL https://claude.ai/install.sh | sh
+
+# From Mac: sync project
+rsync -avz -e "ssh -p <PORT>" ~/cogit-qmech/ root@<IP>:~/cogit-qmech/
 ```
 
-You should see a RunPod welcome screen!
+**⚠️ Port Changes**: If you stop/restart the pod, the port number changes. Update `~/.ssh/config` with the new port from RunPod dashboard.
 
 ---
 
-## Step 4: Setup Environment on Remote (5 min)
+## Using Claude Code & Cursor
 
-Once connected to the remote GPU, run:
+### Option A: Direct SSH + Claude Code
 
 ```bash
-# Clone the repo
-git clone https://github.com/gvmfhy/cogit-qmech.git
-cd cogit-qmech
+# From Mac, SSH into remote
+ssh root@<DROPLET_IP>  # or ssh runpod-gpu
 
-# Run setup script
-bash scripts/remote_setup.sh
+# Start tmux for persistence
+tmux new -s cogit
+
+# Run Claude Code
+cd ~/cogit-qmech
+source .venv/bin/activate
+claude
 ```
 
-The setup script will:
-- ✓ Check GPU availability
-- ✓ Install dependencies
-- ✓ Test PyTorch CUDA
-- ✓ Verify complex number support
+### Option B: Cursor IDE Remote-SSH (Recommended)
+
+**Setup (one-time)**:
+1. Install **Remote-SSH** extension in Cursor
+2. `Cmd+Shift+P` → "Remote-SSH: Connect to Host"
+3. Select your host (DigitalOcean IP or `runpod-gpu`)
+4. Open folder: `/root/cogit-qmech`
+
+**Invoke Claude from Cursor**:
+1. Open Cursor terminal (`` Ctrl+` ``)
+2. Activate venv: `source .venv/bin/activate`
+3. Run: `claude`
+
+**If Claude Code hangs on RunPod** (SSH passphrase issue):
+```bash
+# Use passwordless key instead
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519_nopass
+# Update RunPod config to use this key
+```
 
 ---
 
-## Step 5: Connect Cursor IDE (5 min)
+## Project Sync & Workflow
 
-1. Open Cursor on your Mac
-2. Press `Cmd+Shift+P` → "Remote-SSH: Connect to Host"
-3. Select "runpod-gpu"
-4. Wait for connection (30-60 seconds first time)
-5. Open folder: `/root/cogit-qmech`
+### Automated Sync Script
 
-Now you can:
-- ✅ Edit code on Mac (in Cursor)
-- ✅ Run experiments on GPU (in Cursor's terminal)
-- ✅ See results immediately
-- ✅ Commit from remote or local
+Create `sync_to_remote.sh`:
+```bash
+#!/bin/bash
+# Usage: ./sync_to_remote.sh <provider> <host> [port]
 
----
+PROVIDER=$1
+HOST=$2
+PORT=${3:-22}
 
-## Step 6: Run First Experiment
+if [ "$PROVIDER" = "digitalocean" ]; then
+    rsync -avz --exclude '.git' --exclude '__pycache__' \
+      ~/cogit-qmech/ root@$HOST:~/cogit-qmech/
+elif [ "$PROVIDER" = "runpod" ]; then
+    rsync -avz -e "ssh -p $PORT" --exclude '.git' \
+      ~/cogit-qmech/ root@$HOST:~/cogit-qmech/
+fi
+```
 
-In Cursor's remote terminal:
+### Running Experiments with qwen_remote
 
 ```bash
-cd /root/cogit-qmech
+# SSH into remote
+cd ~/cogit-qmech
 source .venv/bin/activate
 
-# Test with GPT-2 first (sanity check)
-python experiments/sentiment/quantum_phase1_collect.py --preset remote
-
-# Then try Llama 7B (coming soon!)
+# Run full pipeline with Qwen2.5-7B on GPU
+python experiments/sentiment/quantum_phase1_collect.py --preset qwen_remote
+python experiments/sentiment/quantum_phase2_train.py --preset qwen_remote
+python experiments/sentiment/quantum_phase3_test.py --preset qwen_remote
+python experiments/sentiment/test_reversibility.py --preset qwen_remote
 ```
 
----
+### Pulling Results Back
 
-## Daily Workflow
-
-**Starting work**:
-1. Start RunPod pod (if stopped)
-2. Connect Cursor to `runpod-gpu`
-3. Activate venv: `source .venv/bin/activate`
-
-**During work**:
-- Code in Cursor (saves automatically to remote)
-- Run experiments in integrated terminal
-- Monitor GPU usage: `nvidia-smi`
-
-**Ending work**:
-1. Commit your work: `git add . && git commit -m "..." && git push`
-2. Stop the pod in RunPod dashboard (saves $$)
-
-**Cost**: $0.40-0.50/hr × hours used
+```bash
+# From Mac
+rsync -avz root@<HOST>:~/cogit-qmech/results/ ~/cogit-qmech/results/
+rsync -avz root@<HOST>:~/cogit-qmech/models/ ~/cogit-qmech/models/
+```
 
 ---
 
 ## Troubleshooting
 
-**Connection refused**:
-- Check pod is running in RunPod dashboard
-- Verify IP/port in `~/.ssh/config` match current pod
+### RunPod: "SSH client doesn't support PTY"
+**Cause**: Using community cloud without public IP
 
-**CUDA not available**:
-- Run `nvidia-smi` to check GPU
-- Restart pod if needed
+**Solution**: Deploy Secure Cloud with public IP filter selected
 
-**Dependencies missing**:
-- Re-run `bash scripts/remote_setup.sh`
+### Cursor: Can't connect to RunPod
+**Check**:
+1. Pod is running in dashboard
+2. Port number in `~/.ssh/config` matches current pod
+3. Template supports "SSH over exposed TCP"
 
-**Pod stopped automatically**:
-- RunPod stops idle pods after 24h
-- Save work to git before stopping!
+### CUDA out of memory
+**Solution**: Reduce batch size or quantum dimension in config.py
+
+### Claude Code hangs in Cursor terminal
+**Cause**: SSH passphrase issue
+
+**Solution**: Use passwordless SSH key or run ssh-agent before Claude
 
 ---
 
-## Cost Optimization
+## Cost Comparison
 
-**Cheap GPUs** (occasional use):
-- RTX A4000: $0.34/hr (secure cloud)
-- RTX 4090: $0.44/hr (community cloud)
+| Provider | GPU | Cost/hr | Full Pipeline | Notes |
+|----------|-----|---------|---------------|-------|
+| **M1 Mac** | - | $0 | ~10 min (3B only) | Bottlenecked |
+| **DigitalOcean** | Basic GPU | ~$0.75 | ~8 min (7B) | Easy, reliable |
+| **RunPod Secure** | RTX 4090 | ~$0.61 | ~6 min (7B) | +$0.27 for public IP |
+| **RunPod Community** | RTX 4090 | ~$0.34 | N/A | No PTY support! |
 
-**Storage**:
-- Container disk: Free (ephemeral)
-- Volume disk: $0.10/GB/month (persistent)
-
-**Tips**:
-- Stop pod when not using (pause billing)
-- Use "Spot" pricing for 50% discount (may be interrupted)
-- Set auto-stop after 1 hour idle
+**Recommendation**: Start with DigitalOcean, then use RunPod $20 credits for experiments.
 
 ---
 
 ## Next Steps
 
-After setup works:
-1. Test Llama 3.2 3B on GPU
-2. Run full `remote` preset experiments
-3. Investigate transfer attacks (7B → 70B operators)
+1. ✅ Set up DigitalOcean Droplet
+2. 🧪 Run `qwen_remote` preset end-to-end
+3. 💰 Use RunPod $20 credits with public IP setup
+4. 📊 Compare: M1 Mac (6 min) vs GPU (1-2 min) for Phase 1
+5. 🚀 Scale to larger models (14B, 72B)
