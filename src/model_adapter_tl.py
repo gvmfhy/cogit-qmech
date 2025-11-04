@@ -49,44 +49,86 @@ class ModelAdapter(ABC):
 
 
 class TransformerLensAdapter(ModelAdapter):
-    """Adapter using TransformerLens for clean activation extraction and manipulation"""
-    
+    """Adapter using TransformerLens for clean activation extraction and manipulation
+
+    Supports models including:
+    - GPT-2 variants (gpt2, gpt2-medium, gpt2-large, gpt2-xl)
+    - Qwen2.5 variants (Qwen/Qwen2.5-3B-Instruct, Qwen/Qwen2.5-7B-Instruct, etc.)
+    - Gemma variants (google/gemma-2b, google/gemma-7b)
+    - Phi-3 variants (microsoft/phi-3-mini-4k-instruct, etc.)
+    - And many more supported by TransformerLens
+    """
+
     def __init__(self, model_name: str = "gpt2", device: str = "cpu"):
         self.model_name = model_name
         self.device = torch.device(device)
-        
+
         # Load model with TransformerLens - handles all hook management internally
         print(f"Loading {model_name} with TransformerLens...")
-        self.model = HookedTransformer.from_pretrained(
-            model_name,
-            device=device,
-            center_writing_weights=False,  # Keep original behavior
-            center_unembed=False,
-            fold_ln=False  # Don't fold layer norm for cleaner interventions
-        )
-        
+        try:
+            self.model = HookedTransformer.from_pretrained(
+                model_name,
+                device=device,
+                center_writing_weights=False,  # Keep original behavior
+                center_unembed=False,
+                fold_ln=False  # Don't fold layer norm for cleaner interventions
+            )
+        except Exception as e:
+            print(f"Error loading model '{model_name}': {e}")
+            print("\nCommon issues:")
+            print("  1. Model not supported by TransformerLens")
+            print("  2. Model requires authentication (gated models)")
+            print("  3. Typo in model name")
+            print("\nVerify model name at: https://transformerlensorg.github.io/TransformerLens/generated/model_properties_table.html")
+            raise
+
         # Store model config
         self.hidden_dim = self.model.cfg.d_model
         self.num_layers = self.model.cfg.n_layers
+
+        # Print model info
+        print(f"✓ Loaded {model_name}")
+        print(f"  Hidden dim (d_model): {self.hidden_dim}")
+        print(f"  Num layers: {self.num_layers}")
+        print(f"  Num heads: {self.model.cfg.n_heads}")
+        print(f"  Vocab size: {self.model.cfg.d_vocab}")
         
     def extract_hidden_states(self, text: str, layers: List[int]) -> Dict[int, torch.Tensor]:
-        """Extract hidden states using TransformerLens's run_with_cache"""
-        
+        """Extract hidden states using TransformerLens's run_with_cache
+
+        Args:
+            text: Input text to process
+            layers: List of layer indices to extract (0-indexed)
+
+        Returns:
+            Dictionary mapping layer index to activations
+
+        Raises:
+            ValueError: If any layer index is invalid
+        """
+        # Validate layer indices
+        invalid_layers = [layer for layer in layers if layer >= self.num_layers or layer < 0]
+        if invalid_layers:
+            raise ValueError(
+                f"Invalid layer indices {invalid_layers}. "
+                f"Model '{self.model_name}' has {self.num_layers} layers (0-{self.num_layers-1})."
+            )
+
         # Run model with automatic caching - no manual hooks needed!
         logits, cache = self.model.run_with_cache(text)
-        
+
         # Extract requested layers from cache
         activations = {}
         for layer_idx in layers:
-            if layer_idx < self.num_layers:
-                # TransformerLens naming convention: blocks.{layer}.hook_resid_post
-                hook_name = f"blocks.{layer_idx}.hook_resid_post"
-                if hook_name in cache:
-                    # Cache already has everything detached and on CPU
-                    activations[layer_idx] = cache[hook_name].cpu()
-                else:
-                    print(f"Warning: Layer {layer_idx} not found in cache")
-        
+            # TransformerLens naming convention: blocks.{layer}.hook_resid_post
+            hook_name = f"blocks.{layer_idx}.hook_resid_post"
+            if hook_name in cache:
+                # Cache already has everything detached and on CPU
+                activations[layer_idx] = cache[hook_name].cpu()
+            else:
+                # This shouldn't happen if validation passed, but handle gracefully
+                print(f"Warning: Layer {layer_idx} not found in cache (this is unexpected)")
+
         return activations
     
     def inject_hidden_states(self, text: str, modified_states: Dict[int, torch.Tensor], layer: int) -> str:

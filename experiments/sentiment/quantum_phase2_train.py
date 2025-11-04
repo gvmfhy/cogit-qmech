@@ -59,17 +59,20 @@ class UnitaryOperatorTrainer:
         """Load quantum states from Phase 1"""
 
         data_dir = ROOT / self.config.data_dir
-        latest_file = data_dir / "quantum_states_latest.json"
+        model_id = self.config.model_identifier
+
+        # Try model-specific latest file first
+        latest_file = data_dir / f"quantum_states_{model_id}_latest.json"
 
         if not latest_file.exists():
-            # Try to find any quantum states file
-            state_files = list(data_dir.glob("quantum_states_*.json"))
+            # Fallback: try to find any quantum states file for this model
+            state_files = list(data_dir.glob(f"quantum_states_{model_id}_*.json"))
             if state_files:
                 latest_file = max(state_files, key=lambda p: p.stat().st_mtime)
             else:
                 raise FileNotFoundError(
-                    "No quantum states found! Run Phase 1 first:\n"
-                    f"  python experiments/sentiment/quantum_phase1_collect.py --preset {self.config.device}"
+                    f"No quantum states found for model '{model_id}'! Run Phase 1 first:\n"
+                    f"  python experiments/sentiment/quantum_phase1_collect.py --preset {self.config.model_identifier}_tiny"
                 )
 
         print(f"\n[Loading Quantum States]")
@@ -332,15 +335,19 @@ class UnitaryOperatorTrainer:
         models_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        model_id = self.config.model_identifier
 
         print(f"\n[Saving Operators]")
 
         # Save positive → negative operator
-        pos_neg_path = models_dir / f"unitary_pos_to_neg_{self.config.quantum_dim}d_{timestamp}.pt"
+        pos_neg_path = models_dir / f"unitary_pos_to_neg_{model_id}_{self.config.quantum_dim}d_{timestamp}.pt"
         torch.save({
             'model_state_dict': self.operator_pos_to_neg.state_dict(),
             'config': {
+                'model_name': self.config.model_name,
+                'model_identifier': model_id,
                 'quantum_dim': self.config.quantum_dim,
+                'input_dim': self.config.input_dim,
                 'preset': 'unknown'  # Will be set by caller
             },
             'training_history': training_history['pos_to_neg'],
@@ -350,11 +357,14 @@ class UnitaryOperatorTrainer:
         print(f"  ✓ Saved U_pos→neg to {pos_neg_path.name}")
 
         # Save negative → positive operator
-        neg_pos_path = models_dir / f"unitary_neg_to_pos_{self.config.quantum_dim}d_{timestamp}.pt"
+        neg_pos_path = models_dir / f"unitary_neg_to_pos_{model_id}_{self.config.quantum_dim}d_{timestamp}.pt"
         torch.save({
             'model_state_dict': self.operator_neg_to_pos.state_dict(),
             'config': {
+                'model_name': self.config.model_name,
+                'model_identifier': model_id,
                 'quantum_dim': self.config.quantum_dim,
+                'input_dim': self.config.input_dim,
                 'preset': 'unknown'
             },
             'training_history': training_history['neg_to_pos'],
@@ -363,9 +373,9 @@ class UnitaryOperatorTrainer:
 
         print(f"  ✓ Saved U_neg→pos to {neg_pos_path.name}")
 
-        # Create symlinks to 'latest'
-        latest_pos_neg = models_dir / "unitary_pos_to_neg_latest.pt"
-        latest_neg_pos = models_dir / "unitary_neg_to_pos_latest.pt"
+        # Create model-specific symlinks to 'latest'
+        latest_pos_neg = models_dir / f"unitary_pos_to_neg_{model_id}_latest.pt"
+        latest_neg_pos = models_dir / f"unitary_neg_to_pos_{model_id}_latest.pt"
 
         if latest_pos_neg.exists():
             latest_pos_neg.unlink()
@@ -375,7 +385,7 @@ class UnitaryOperatorTrainer:
         latest_pos_neg.symlink_to(pos_neg_path.name)
         latest_neg_pos.symlink_to(neg_pos_path.name)
 
-        print(f"  ✓ Created symlinks to 'latest'")
+        print(f"  ✓ Created symlinks: unitary_*_{model_id}_latest.pt")
 
 
 def run_phase2(preset: str = 'local'):
@@ -413,8 +423,8 @@ def main():
         '--preset',
         type=str,
         default='local',
-        choices=['tiny', 'local', 'remote'],
-        help='Configuration preset'
+        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers'],
+        help='Configuration preset (tiny/local/remote=GPT-2, qwen_*=Qwen2.5-3B)'
     )
 
     args = parser.parse_args()

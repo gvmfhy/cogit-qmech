@@ -30,9 +30,11 @@ class QuantumStateEncoder:
         Initialize quantum encoder with deterministic random projection
 
         Args:
-            input_dim: Dimension of neural network activations (e.g., GPT-2 = 768)
-            quantum_dim: Dimension of quantum state space (default 10,000)
-            seed: Random seed for reproducibility
+            input_dim: Dimension of neural network activations
+                      Common values: GPT-2 = 768, Qwen2.5-3B = 2048, Gemma-2B = 2048
+            quantum_dim: Dimension of quantum state space
+                        Recommendation: Use ~2.6x input_dim for consistency with original experiments
+            seed: Random seed for reproducibility (default: 42)
         """
         self.input_dim = input_dim
         self.quantum_dim = quantum_dim
@@ -41,7 +43,8 @@ class QuantumStateEncoder:
         print(f"[Quantum State Encoder]")
         print(f"  Real activations: {input_dim}-d")
         print(f"  Quantum states:   {quantum_dim}-d (complex)")
-        print(f"  Seed: {seed}")
+        print(f"  Ratio:            {quantum_dim / input_dim:.2f}x")
+        print(f"  Seed:             {seed}")
 
         # Create deterministic complex projection matrix
         torch.manual_seed(seed)
@@ -210,11 +213,16 @@ class QuantumStateEncoder:
         """
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Validate dimensions
+        assert self.projection.shape == (self.input_dim, self.quantum_dim), \
+            f"Projection shape mismatch: {self.projection.shape} vs expected ({self.input_dim}, {self.quantum_dim})"
+
         torch.save({
             'projection': self.projection,
             'input_dim': self.input_dim,
             'quantum_dim': self.quantum_dim,
-            'seed': self.seed
+            'seed': self.seed,
+            'ratio': self.quantum_dim / self.input_dim
         }, save_path)
 
         print(f"  ✓ Projection matrix saved to {save_path}")
@@ -241,7 +249,13 @@ class QuantumStateEncoder:
         # Override with saved projection
         encoder.projection = checkpoint['projection']
 
+        # Validate dimensions
+        assert encoder.projection.shape == (encoder.input_dim, encoder.quantum_dim), \
+            f"Loaded projection shape mismatch: {encoder.projection.shape}"
+
         print(f"  ✓ Loaded projection matrix from {load_path}")
+        if 'ratio' in checkpoint:
+            print(f"    Ratio: {checkpoint['ratio']:.2f}x")
         return encoder
 
 

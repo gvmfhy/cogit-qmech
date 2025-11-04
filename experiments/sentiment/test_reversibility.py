@@ -58,7 +58,8 @@ class ReversibilityTester:
         """Load quantum states from Phase 1"""
 
         data_dir = ROOT / self.config.data_dir
-        latest_file = data_dir / "quantum_states_latest.json"
+        model_id = self.config.model_identifier
+        latest_file = data_dir / f"quantum_states_{model_id}_latest.json"
 
         if not latest_file.exists():
             raise FileNotFoundError("Quantum states not found! Run Phase 1 first.")
@@ -88,11 +89,12 @@ class ReversibilityTester:
         """Load trained operators"""
 
         models_dir = ROOT / self.config.models_dir
+        model_id = self.config.model_identifier
 
         print("\n[Loading Operators]")
 
         # Load U_pos→neg
-        pos_neg_file = models_dir / "unitary_pos_to_neg_latest.pt"
+        pos_neg_file = models_dir / f"unitary_pos_to_neg_{model_id}_latest.pt"
         checkpoint_pos_neg = torch.load(pos_neg_file, map_location='cpu')
         quantum_dim = checkpoint_pos_neg['config']['quantum_dim']
 
@@ -101,7 +103,7 @@ class ReversibilityTester:
         self.operator_pos_to_neg.eval()
 
         # Load U_neg→pos
-        neg_pos_file = models_dir / "unitary_neg_to_pos_latest.pt"
+        neg_pos_file = models_dir / f"unitary_neg_to_pos_{model_id}_latest.pt"
         checkpoint_neg_pos = torch.load(neg_pos_file, map_location='cpu')
 
         self.operator_neg_to_pos = UnitaryOperator(quantum_dim=quantum_dim)
@@ -380,7 +382,7 @@ def main():
         '--preset',
         type=str,
         default='local',
-        choices=['tiny', 'local', 'remote'],
+        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers'],
         help='Configuration preset'
     )
 

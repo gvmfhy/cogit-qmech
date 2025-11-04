@@ -50,11 +50,17 @@ class QuantumDataCollector:
 
         config.print_summary()
 
-        # Load GPT-2
-        print("\n[Loading GPT-2 with TransformerLens]")
+        # Load model
+        print(f"\n[Loading {config.model_name} with TransformerLens]")
         device = 'cpu'  # Always use CPU for inference (MPS has some issues with TransformerLens)
-        self.adapter = TransformerLensAdapter("gpt2", device)
-        print(f"✓ GPT-2 loaded on {device}")
+        self.adapter = TransformerLensAdapter(config.model_name, device)
+        print(f"✓ Model loaded on {device}")
+
+        # Validate config input_dim matches model
+        if config.input_dim != self.adapter.hidden_dim:
+            print(f"Warning: Config input_dim ({config.input_dim}) doesn't match model hidden_dim ({self.adapter.hidden_dim})")
+            print(f"  Using model's hidden_dim: {self.adapter.hidden_dim}")
+            config.input_dim = self.adapter.hidden_dim
 
         # Create quantum encoder
         print("\n[Creating Quantum State Encoder]")
@@ -190,6 +196,8 @@ class QuantumDataCollector:
                 for state in negative_quantum
             ],
             'config': {
+                'model_name': self.config.model_name,
+                'model_identifier': self.config.model_identifier,
                 'quantum_dim': self.config.quantum_dim,
                 'input_dim': self.config.input_dim,
                 'num_states': len(positive_quantum),
@@ -200,8 +208,9 @@ class QuantumDataCollector:
             'timestamp': timestamp
         }
 
-        # Save quantum states
-        output_file = output_dir / f"quantum_states_{self.config.quantum_dim}d_{timestamp}.json"
+        # Save quantum states (include model identifier in filename)
+        model_id = self.config.model_identifier
+        output_file = output_dir / f"quantum_states_{model_id}_{self.config.quantum_dim}d_{timestamp}.json"
 
         print(f"\n[Saving Quantum Data]")
         print(f"  File size estimate: {len(positive_quantum) * 2 * self.config.quantum_dim * 8 / 1024 / 1024:.1f} MB")
@@ -212,12 +221,12 @@ class QuantumDataCollector:
         print(f"✓ Saved quantum states to {output_file.name}")
 
         # Save encoder projection matrix separately (for decoding)
-        projection_file = output_dir / f"encoder_projection_{self.config.quantum_dim}d_{timestamp}.pt"
+        projection_file = output_dir / f"encoder_projection_{model_id}_{self.config.quantum_dim}d_{timestamp}.pt"
         self.encoder.save_projection_matrix(projection_file)
 
-        # Create symlinks to 'latest' for easy access
-        latest_states = output_dir / "quantum_states_latest.json"
-        latest_projection = output_dir / "encoder_projection_latest.pt"
+        # Create model-specific symlinks to 'latest' for easy access
+        latest_states = output_dir / f"quantum_states_{model_id}_latest.json"
+        latest_projection = output_dir / f"encoder_projection_{model_id}_latest.pt"
 
         # Remove old symlinks if they exist
         if latest_states.exists():
@@ -229,8 +238,8 @@ class QuantumDataCollector:
         latest_states.symlink_to(output_file.name)
         latest_projection.symlink_to(projection_file.name)
 
-        print(f"✓ Created symlink: quantum_states_latest.json")
-        print(f"✓ Created symlink: encoder_projection_latest.pt")
+        print(f"✓ Created symlink: quantum_states_{model_id}_latest.json")
+        print(f"✓ Created symlink: encoder_projection_{model_id}_latest.pt")
 
         return output_file
 
@@ -276,8 +285,8 @@ def main():
         '--preset',
         type=str,
         default='local',
-        choices=['tiny', 'local', 'remote'],
-        help='Configuration preset (tiny=testing, local=M1, remote=cloud)'
+        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers'],
+        help='Configuration preset (tiny/local/remote=GPT-2, qwen_tiny/qwen_local/qwen_test_layers=Qwen2.5-3B)'
     )
 
     args = parser.parse_args()

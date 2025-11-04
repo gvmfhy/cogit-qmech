@@ -54,21 +54,22 @@ class QuantumInterventionSystem:
         self.create_decoder()
 
     def load_gpt2(self):
-        """Load GPT-2 model"""
-        print("\n[Loading GPT-2]")
-        self.adapter = TransformerLensAdapter("gpt2", "cpu")
-        print("✓ GPT-2 loaded")
+        """Load language model from config"""
+        print(f"\n[Loading {self.config.model_name}]")
+        self.adapter = TransformerLensAdapter(self.config.model_name, "cpu")
+        print(f"✓ {self.config.model_name} loaded")
 
     def load_encoder(self):
         """Load quantum encoder from Phase 1"""
         print("\n[Loading Quantum Encoder]")
 
         data_dir = ROOT / self.config.data_dir
-        projection_file = data_dir / "encoder_projection_latest.pt"
+        model_id = self.config.model_identifier
+        projection_file = data_dir / f"encoder_projection_{model_id}_latest.pt"
 
         if not projection_file.exists():
             raise FileNotFoundError(
-                "Encoder projection not found! Run Phase 1 first."
+                f"Encoder projection for {model_id} not found! Run Phase 1 first."
             )
 
         self.encoder = QuantumStateEncoder.load_from_saved(projection_file)
@@ -79,9 +80,10 @@ class QuantumInterventionSystem:
         print("\n[Loading Unitary Operators]")
 
         models_dir = ROOT / self.config.models_dir
+        model_id = self.config.model_identifier
 
         # Load U_pos→neg
-        pos_neg_file = models_dir / "unitary_pos_to_neg_latest.pt"
+        pos_neg_file = models_dir / f"unitary_pos_to_neg_{model_id}_latest.pt"
         if not pos_neg_file.exists():
             raise FileNotFoundError(
                 "Operator U_pos→neg not found! Run Phase 2 first."
@@ -97,7 +99,7 @@ class QuantumInterventionSystem:
         print(f"✓ Loaded U_pos→neg ({quantum_dim:,}-d)")
 
         # Load U_neg→pos
-        neg_pos_file = models_dir / "unitary_neg_to_pos_latest.pt"
+        neg_pos_file = models_dir / f"unitary_neg_to_pos_{model_id}_latest.pt"
         if not neg_pos_file.exists():
             raise FileNotFoundError(
                 "Operator U_neg→pos not found! Run Phase 2 first."
@@ -357,7 +359,7 @@ def main():
         '--preset',
         type=str,
         default='local',
-        choices=['tiny', 'local', 'remote'],
+        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers'],
         help='Configuration preset'
     )
 
