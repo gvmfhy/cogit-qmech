@@ -365,3 +365,43 @@ Through this implementation, we've validated:
 ---
 
 Ready to implement the experimental pipeline (Phases 1-3)? Or would you like to review/test what we have first?
+
+---
+
+## 🔬 Current Experiment: Qwen2.5-7B GPU Baseline (Run 001)
+
+**Status**: In Progress
+**Date Started**: 2025-11-04
+**Hardware**: RunPod RTX 5090 (32GB VRAM, $0.89/hr)
+**Connection**: ssh -p 17546 root@103.196.86.239
+**Credits Remaining**: $7.48 (~8 hours)
+
+### Objective
+Establish baseline quantum manipulation performance on Qwen2.5-7B to enable transfer attack research (7B → 70B testing).
+
+### Progress Tracker
+
+**Documentation**:
+- [x] EXPERIMENT_LOG.md created
+- [x] TRANSFER_ATTACK_PROTOCOL.md created
+- [x] .gitignore updated (results/ now tracked)
+
+**Experimental Pipeline**:
+- [ ] Phase 1: Quantum state collection (~5-7 min)
+- [ ] Phase 2: Unitary operator training (~3-5 min)
+- [ ] Phase 3: Intervention testing (~2-3 min)
+- [ ] Phase 4: Reversibility validation (~1-2 min)
+
+**Data Preservation**:
+- [ ] Results synced to local Mac (end of night)
+- [ ] Findings documented in EXPERIMENT_LOG.md
+- [ ] Results committed to git
+
+### Next Steps
+1. Push documentation to GitHub
+2. Pull on RunPod
+3. Run full experimental pipeline
+4. Document findings
+5. Plan Phase 2: Transfer attack experiment (70B)
+
+---

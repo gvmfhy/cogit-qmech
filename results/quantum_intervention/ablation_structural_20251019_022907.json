@@ -1,0 +1,20 @@
+{
+  "results": {
+    "pos_the_to_neg": 0.9914416908224425,
+    "pos_nonthe_to_neg": 0.9910884150392133,
+    "pos_to_neg_diff": 0.00035327578322918995,
+    "neg_the_to_pos": 0.9917981362801331,
+    "neg_nonthe_to_pos": 0.9911460495491822,
+    "neg_to_pos_diff": 0.0006520867309509626
+  },
+  "stimulus_counts": {
+    "positive_the": 12,
+    "positive_nonthe": 38,
+    "negative_the": 26,
+    "negative_nonthe": 24
+  },
+  "config": {
+    "quantum_dim": 2000
+  },
+  "timestamp": "20251019_022907"
+}

@@ -1,0 +1,95 @@
+{
+  "results": [
+    {
+      "prompt": "The meeting this afternoon will",
+      "baseline": "fternoon will be held at the Department of Housing and Urban Development's campus in East New York, where the Department of Housing and Urban Development",
+      "interventions_negative": {
+        "0.02": "fternoon will include all aspects of the administration's review of the N.R.A. program and how it will be evaluated by the",
+        "0.05": "fternoon will see the two parties to the Iran deal set out a series of demands, including a timetable for the release of Americans of people",
+        "0.1": "fternoon will look to create at least two new regional standards for the export of cannabis, with the first one being an end to the state",
+        "0.2": "fternoon will take place in San Francisco's Pacific Palisades park. (Photo: Cal Poly/@sfpalisadingpark)"
+      },
+      "interventions_positive": {
+        "0.02": "fternoon will see a range of top business figures.\n\nThe UK's financial services giant, Barclays, the investment bank of the United",
+        "0.05": "fternoon will see a series of key changes to the U.S. immigration system, including the establishment of a task force to consider and",
+        "0.1": "fternoon will discuss other options that the Trump administration is considering to deal with the issue of transgender and gender-variant children, according to",
+        "0.2": "fternoon will see the European Commission's (EC) antitrust chief, Osk to Mona Ryvap\u00f3, meet EU officials to"
+      }
+    },
+    {
+      "prompt": "I opened the envelope and found",
+      "baseline": "ope and found a bottle of my favorite perfume. It smelled like an oil, an olfactory perfume, an olfactory taste which",
+      "interventions_negative": {
+        "0.02": "ope and found \"Amber's Notes\" on it. I took a look, but I found this wasn't the package I was looking",
+        "0.05": "ope and found a card with a word on it. I knew it was for my new partner, but I didn't want to risk getting",
+        "0.1": "ope and found the following:\n\nA small packet of paper, containing the following information:\n\nYour email address\n\nYour phone",
+        "0.2": "ope and found out that I had received an email from the following address from the following address. It was:\n\nSeth"
+      },
+      "interventions_positive": {
+        "0.02": "ope and found a bunch of free E-books and a CD with the name and title of a very great book. I opened it up",
+        "0.05": "ope and found a copy of The Complete and Incomplete Works of George Orwell. I read it for a little over half an hour before finally",
+        "0.1": "ope and found a note from my boyfriend. \"Hi, I'm John, and the last day of the year. I just found out",
+        "0.2": "ope and found a packet of four tl;d.\n\nI open the envelope and find out that I have a 1.2"
+      }
+    },
+    {
+      "prompt": "The restaurant downtown is",
+      "baseline": "t downtown is an old school, one that has recently become a more popular destination.\n\nThis small eatery is one of the oldest",
+      "interventions_negative": {
+        "0.02": "t downtown is back in business for the first time since it closed for good, a new location was announced and the final two floors of the",
+        "0.05": "t downtown is set to be torn down this summer after a fire destroyed part of its face.\n\nResidents from the corner of 12th",
+        "0.1": "t downtown is up for an opening.\n\nThe Northside Group is offering its first downtown location, 500 N. State, as a",
+        "0.2": "t downtown is a destination for the whole family. The cozy atmosphere and popular food make for a great stop out of town spot. If you"
+      },
+      "interventions_positive": {
+        "0.02": "t downtown is back in business.\n\nAs of Friday, Vicious Burger is bringing back the restaurant's K-12, but from",
+        "0.05": "t downtown is buzzing with a new line of craft-filled, vegan-inspired burgers starting in April.\n\nChambari,",
+        "0.1": "t downtown is filled with business of some of the best in the area.\n\nThe Downtown Grill and Pub is a two way destination with",
+        "0.2": "t downtown is buzzing with a live music scene that's been out of style for years. ( Scott Hanwie / St. Cloud Times"
+      }
+    },
+    {
+      "prompt": "My friend called to say",
+      "baseline": "called to say I had an idea. I thought, well, maybe I'm just going to go make some music, but this is pretty",
+      "interventions_negative": {
+        "0.02": "called to say she got this cute little dildo out of a closet. It was so small I have to put a large stick in to",
+        "0.05": "called to say I had to go to my local branch or the local department store because I had my car towed. I had to go to",
+        "0.1": "called to say that my husband and I went to a party at the place where I worked. I thought to myself it was a good time",
+        "0.2": "called to say he was in the middle of his shift, and we were watching my wife work. He said, \"Did you see her"
+      },
+      "interventions_positive": {
+        "0.02": "called to say she was having an issue with my new new guitar. I said I was going to go buy an electric guitar and play it",
+        "0.05": "called to say her boyfriend had just been arrested for robbery. I told him, \"If he's innocent he should be in jail.\" He",
+        "0.1": "called to say I had noticed a large amount of interest in one of the photos. I hadn't seen a photographer like that before, but",
+        "0.2": "called to say that I was on my way from a business trip to Miami to join my son for the new year. I had just been"
+      }
+    },
+    {
+      "prompt": "The project manager announced that",
+      "baseline": "nnounced that she was looking forward to working with the team in October to bring the project to the public in full.\n\n\"We",
+      "interventions_negative": {
+        "0.02": "nnounced that it was a cross-platform, cross-platform mobile application support tool written in Swift. We'll have more on this in",
+        "0.05": "nnounced that he was taking action to fix a \"technical issue\" with the API to allow for the installation of the mobile app from home",
+        "0.1": "nnounced that it has signed on to create and run the team's new digital store, which is expected to launch this year in the UK",
+        "0.2": "nnounced that the project would be moving forward on October 3, after a number of challenges and issues were resolved, with the project moving forward"
+      },
+      "interventions_positive": {
+        "0.02": "nnounced that in light of the recent release of its 3.0.1 patch, it was testing the first version of the feature out",
+        "0.05": "nnounced that the project is getting off to a good start. \"As you can see from the images we have seen over the last couple",
+        "0.1": "nnounced that the company had signed a $2.3-million licensing agreement with the FIA to build a 3.5-mile,",
+        "0.2": "nnounced that Apple is starting to build support for its new iPhone 7 and iPhone 7S, the first iPhone 7 and iPhone 7 (L"
+      }
+    }
+  ],
+  "config": {
+    "quantum_dim": 500,
+    "blend_ratios": [
+      0.02,
+      0.05,
+      0.1,
+      0.2
+    ],
+    "target_layer": 6
+  },
+  "timestamp": "20251019_014213"
+}

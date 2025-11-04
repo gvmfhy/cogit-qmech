@@ -33,12 +33,11 @@ env/
 # Data files (large, regenerate as needed)
 data/
 models/
-results/
+# results/ - NOW TRACKED IN GIT (small JSON files for reproducibility)
 
 # Keep directory structure but ignore contents
 !data/.gitkeep
 !models/.gitkeep
-!results/.gitkeep
 
 # IDE
 .vscode/

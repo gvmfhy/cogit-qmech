@@ -1,0 +1,95 @@
+{
+  "results": [
+    {
+      "prompt": "The meeting this afternoon will",
+      "baseline": "fternoon will see the U.S. Senate and House vote on a bill to establish an independent watchdog to crack down on illegal immigration by",
+      "interventions_negative": {
+        "0.02": "fternoon will come as the new Labor government's latest budget is due to be delivered.\n\nThe Coalition is due to make its first",
+        "0.05": "fternoon will begin with an in-person press briefing with leaders from three of the 10 countries on the fight against climate change.",
+        "0.1": "fternoon will include representatives from the Obama administration, Sen. Bernie Sanders (I-Vt.), the Republican-led Senate Minority Leader Mitch",
+        "0.2": "fternoon will provide a clear indication of how the Trump administration is taking on the president's most controversial executive action regarding travel from several countries."
+      },
+      "interventions_positive": {
+        "0.02": "fternoon will include state Sen. David Latham, R-Chatham.\n\nThe bill was proposed by U.S. Rep",
+        "0.05": "fternoon will discuss the progress of the United States in the fight against what the Pentagon has described as \"the most extreme vetting regime in the",
+        "0.1": "fternoon will be held at the US military's headquarters in Yokosuka, Japan.\n\nA group of US Army Joint Task Force",
+        "0.2": "fternoon will come as no surprise to those of you who have followed the D.C. Capital's football team the last couple of seasons"
+      }
+    },
+    {
+      "prompt": "I opened the envelope and found",
+      "baseline": "ope and found a book.\n\nIt was the first book I read when I began writing. The second book was a book about the",
+      "interventions_negative": {
+        "0.02": "ope and found a receipt:\n\nCAMPBELL, I'M THE TEMPERATURE MANUFACTURER, AND",
+        "0.05": "ope and found a letter from my ex-husband, that he had just experienced. He'd been in the news all day and he asked",
+        "0.1": "ope and found a letter from a friend. This letter was from the editor of the Sun-Times (a conservative paper in the conservative state",
+        "0.2": "ope and found a photo of a very small pink flower. I placed 1/4\" round, and with a square of scissors cut out"
+      },
+      "interventions_positive": {
+        "0.02": "ope and found a copy of [The Complete Guide to the New York Stock Exchange (NYSX] and a letter from one Dr.",
+        "0.05": "ope and found the following:\n\nThank you for taking the time to read this review of the original release of Oasis. I am",
+        "0.1": "ope and found a piece of paper with the following information to do the rounds on me...Cameron Diaz, the CEO of a health care",
+        "0.2": "ope and found the following note . I felt so badly for my Santa, I had to read it over and over again. I have been"
+      }
+    },
+    {
+      "prompt": "The restaurant downtown is",
+      "baseline": "t downtown is a must for anyone looking to take advantage of the newest developments in downtown Pittsburgh.\n\nWith a massive underground food court,",
+      "interventions_negative": {
+        "0.02": "t downtown is getting a new tenant next month with the purchase of North Star Eatery.\n\nThe building at 18 N. Market St",
+        "0.05": "t downtown is also known for the popular food trucks. ( David Rupp / Houston Chronicle FILE PHOTO ) Houston's most popular food trucks are",
+        "0.1": "t downtown is about two hours from Times Square and three hours from the Times Square BART station, so it's a long way from the two",
+        "0.2": "t downtown is home to the St. Michael's St. Mary's for St.. John's Day, a Catholic-run, St"
+      },
+      "interventions_positive": {
+        "0.02": "t downtown is a place of art, of music, and of good food. I'm one of the few that can stand the daily traffic",
+        "0.05": "t downtown is on the market for a $75 million, two-story, three- and five-story towers that will add 11,",
+        "0.1": "t downtown is a haven for the homeless, with staff on hand for anything from a one-man shift on weekdays to a wide assortment",
+        "0.2": "t downtown is about to open its first Greek-made and gluten-free in the city.\n\nThe Greek-made \"Chop"
+      }
+    },
+    {
+      "prompt": "My friend called to say",
+      "baseline": "called to say to me that I was seeing a new character called \"The Bitch\" for the upcoming Game of Thrones. I didn't",
+      "interventions_negative": {
+        "0.02": "called to say he was visiting from out of town and that it was a good day.\n\nHe was very kind to be around.",
+        "0.05": "called to say he was going to see another friend to spend the night with, and she was fine with any way he did it. So",
+        "0.1": "called to say that I had called the office, and they had told me that they would be sending him my postcard book. The box",
+        "0.2": "called to say I was having a hard day. \"So you're going to be here in a few days, then we can get your"
+      },
+      "interventions_positive": {
+        "0.02": "called to say that I was thinking of sending my friend some food and she was a little worried that I was getting too much from the dish",
+        "0.05": "called to say it. A friend of mine is from Ohio, and I was sitting at her house on the way to work, and that",
+        "0.1": "called to say that I had an alarm going off at work, so I decided to see if I could get in on the act. I",
+        "0.2": "called to say he was trying to find some pictures of a cow in a park. He ended up getting a few of them, but couldn"
+      }
+    },
+    {
+      "prompt": "The project manager announced that",
+      "baseline": "nnounced that the initial release will be a single release that focuses on the work currently being done to make this tool available to the general public",
+      "interventions_negative": {
+        "0.02": "nnounced that the mobile banking service would be offering a number of new services in the next couple of months, including a video-on-",
+        "0.05": "nnounced that \"next generation\" tablets would be in the works, and added that the company had the full support of Microsoft, Apple and",
+        "0.1": "nnounced that the company has begun a series of more than 200 sales of the new, twin-bed Mercedes-Benz S-Class to",
+        "0.2": "nnounced that they have now officially joined forces to create a new Steam Controller for The Witcher 3. We also know that the game is scheduled"
+      },
+      "interventions_positive": {
+        "0.02": "nnounced that the new station's first-ever self-supporting battery would be one-fourth the size of the one Tesla would be",
+        "0.05": "nnounced that in addition to the new 2.0.1 release of the Google Play Store, the company will be releasing a third-",
+        "0.1": "nnounced that he will be stepping down as developer of the Android application development language for Google's Android application and service platforms this fall.",
+        "0.2": "nnounced that the team is launching a \"New & Different\" campaign to get customers to submit comments about the project on its Facebook event page"
+      }
+    }
+  ],
+  "config": {
+    "quantum_dim": 2000,
+    "blend_ratios": [
+      0.02,
+      0.05,
+      0.1,
+      0.2
+    ],
+    "target_layer": 6
+  },
+  "timestamp": "20251019_021954"
+}
