@@ -423,8 +423,8 @@ def main():
         '--preset',
         type=str,
         default='local',
-        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers'],
-        help='Configuration preset (tiny/local/remote=GPT-2, qwen_*=Qwen2.5-3B)'
+        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote'],
+        help='Configuration preset (tiny/local/remote=GPT-2, qwen_*=Qwen2.5-3B/7B)'
     )
 
     args = parser.parse_args()
