@@ -306,5 +306,137 @@ def load_operator_smart(file_path, quantum_dim, device='cuda'):
 
 ---
 
-**Last Updated:** 2025-11-04
-**Decisions Logged:** 1
+## Decision #002: Abort RTX 5090, Migrate to H100
+
+**Date:** 2025-11-04
+**Time:** ~00:30 UTC
+**Context:** Phase 3 running on RTX 5090 with CPU operators (estimated 2 hours to complete)
+
+### The Problem
+
+Phase 1 & 2 completed successfully on RTX 5090, but Phase 3 revealed critical performance issue:
+
+**Measured performance:**
+- Operators on CPU due to memory constraints
+- First prompt baseline: Generated successfully
+- Estimated time for full Phase 3: **90-135 minutes** (unacceptably slow)
+- Each of 45 generations: ~2-3 minutes (CPU matrix multiplication bottleneck)
+
+**Why slow:**
+- CPU matmul for 174M parameter operators (9333×9333 complex matrices)
+- Data transfers: GPU → CPU → CPU compute → CPU → GPU
+- No parallelization on CPU vs GPU tensor cores
+
+### Data Already Saved
+
+**Completed & portable work:**
+- ✅ Phase 1: Quantum states (41MB, saved to Mac)
+- ✅ Phase 2: 2× operators trained to 98.9% fidelity (2.6GB, saved to Mac)
+- ✅ Documentation: TROUBLESHOOTING.md, DECISIONS.md, TODO_REFACTORING.md
+- ✅ Code improvements: Device handling, git workflow
+
+**Total rsync:**Transfer time: ~3 minutes
+
+**What we're abandoning:**
+- ❌ Phase 3 partial run (~30 min invested, ~90-120 min remaining)
+- Decision: Sunk cost, not worth waiting
+
+---
+
+### Options Considered
+
+#### A) Wait for RTX 5090 Phase 3 to complete (2 hours)
+- ✅ Get FP16 baseline results
+- ✅ Validate full pipeline
+- ❌ Costs ~$1.78 ($0.89/hr × 2hr)
+- ❌ Wastes time (can't iterate)
+- ❌ No time left for Phase 4 or Run 002
+
+#### B) Kill Phase 3, switch to quantization on RTX 5090
+- ✅ Faster (Q8: 6-12 min vs 2 hours)
+- ✅ Operators fit on GPU
+- ❌ 30-60 min setup time (find Q8 model, test compatibility)
+- ❌ Risk: TransformerLens may not support quantization
+- ❌ Still limited to 32GB for future 70B experiments
+
+#### C) Kill Phase 3, migrate to H100 (80GB)
+- ✅ **10-15× faster** (GPU operators: 5-10 min vs 2 hours)
+- ✅ All data portable (Phases 1 & 2 reusable)
+- ✅ Validates proper GPU execution path
+- ✅ Establishes workflow for 70B experiments
+- ✅ Total time: 20 min (Phase 3: 10 min + Phase 4: 5 min + setup: 5 min)
+- ❌ Costs ~$0.50-$1.00 (20-40 min @ ~$1.50/hr typical H100 rate)
+- ⚠️ Requires pod availability
+
+---
+
+### Decision Made
+
+**Option C: Abort RTX 5090, migrate to H100**
+
+### Reasoning
+
+1. **Sunk cost fallacy avoided:** 30 min invested < 90 min remaining
+2. **Science quality:** H100 run validates operators work properly on GPU (important for paper)
+3. **Time efficiency:** H100 completes Phases 3+4 in 20 min vs 2+ hours on RTX 5090
+4. **Cost efficiency:** ~$0.50 H100 vs $1.78 RTX 5090
+5. **Future-proofing:** Establishes H100 workflow needed for 70B experiments
+6. **Learning opportunity:** Tests portability of Phase 1 & 2 artifacts
+
+### Tradeoffs Accepted
+
+- **No FP16 CPU baseline:** We won't have slow-mode results to compare
+  - Mitigation: Not scientifically valuable anyway (CPU is just a workaround)
+- **Pod availability risk:** H100 pods may not be available immediately
+  - Mitigation: Try multiple providers (RunPod, Lambda Labs, Vast.ai)
+- **Setup time:** 5-10 min to configure new pod
+  - Mitigation: Rsync already complete, just need env setup
+
+### Actions Taken
+
+1. ✅ Killed Phase 3 on RTX 5090 (pkill -9)
+2. ✅ Rsynced data to Mac:
+   - `~/cogit-qmech-backup/data/sentiment_quantum/` (558MB)
+   - `~/cogit-qmech-backup/models/quantum_operators/` (2.6GB)
+3. ✅ Created TODO_REFACTORING.md documenting technical debt
+4. 📝 Next: Shut down RTX 5090 pod, spin up H100
+
+### Technical Debt Acknowledged
+
+**Files with hardcoded CPU that will break on H100:**
+- `experiments/sentiment/quantum_phase3_test.py:95-120` - Force CPU loading
+- `experiments/sentiment/quantum_phase3_test.py:179` - Force CPU execution
+
+**Critical refactoring needed before H100:**
+- Device-aware operator loading with memory checking
+- Device-aware intervention function
+- GPU memory profiling
+- See TODO_REFACTORING.md for details
+
+**Plan:** Refactor ASAP after H100 pod is up
+
+### Validation Criteria
+
+**How we'll know this was the right decision:**
+1. **H100 Phase 3 completes in <15 min** (vs 2hr projected on RTX 5090)
+2. **Operators load to GPU successfully** (validates refactoring works)
+3. **Results match expectations** (sentiment shifts visible)
+4. **Phase 4 completes** (have time for reversibility testing)
+5. **Total cost < $1.00** (cheaper than waiting on RTX 5090)
+
+### Future Implications
+
+**For 70B experiments:**
+- This migration validates data portability
+- H100 workflow established (clone → rsync → run)
+- Proves Phase 1 & 2 artifacts are model-independent
+
+**For production:**
+- Demonstrates value of device-aware code
+- Shows importance of memory profiling
+- Validates hybrid CPU/GPU as last resort, not design
+
+---
+
+**Last Updated:** 2025-11-04 00:30 UTC
+**Decisions Logged:** 2
