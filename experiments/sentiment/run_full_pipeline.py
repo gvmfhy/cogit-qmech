@@ -275,7 +275,7 @@ def main():
         '--preset',
         type=str,
         required=True,
-        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_remote'],
+        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_remote', 'pythia_410m', 'pythia_test_layers'],
         help='Configuration preset'
     )
 
