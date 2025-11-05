@@ -496,7 +496,7 @@ def main():
         '--preset',
         type=str,
         default='local',
-        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'qwen3_4b'],
+        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'pythia_test_layers', 'qwen3_4b'],
         help='Configuration preset'
     )
     parser.add_argument('--model', type=str, default='', help='Override model name (e.g., pythia-410m, pythia-1.4b, Qwen/Qwen3-8B)')

@@ -278,6 +278,27 @@ class QuantumConfig:
         )
 
     @classmethod
+    def pythia_test_layers(cls) -> 'QuantumConfig':
+        """
+        Preset for testing multiple layers with Pythia-410M
+
+        Tests layers at different depths to find optimal layer for sentiment separation
+        Memory estimate: ~1.5GB
+        """
+        return cls(
+            model_name="EleutherAI/pythia-410m",
+            input_dim=1024,
+            quantum_dim=2000,  # Smaller for speed
+            learning_rate=0.001,
+            epochs=50,
+            batch_size=5,
+            num_prompts=20,
+            target_layer=12,  # Default if test_layers not specified
+            test_layers=[6, 12, 18, 20, 22],  # Test at 25%, 50%, 75%, 83%, 92% depth
+            device='auto'
+        )
+
+    @classmethod
     def qwen3_4b(cls) -> 'QuantumConfig':
         """
         Qwen3-4B (April 2025 SOTA, optimal for quantum steering)
@@ -302,12 +323,12 @@ class QuantumConfig:
         )
 
     @classmethod
-    def from_preset(cls, preset: Literal['local', 'remote', 'tiny', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'qwen3_4b']) -> 'QuantumConfig':
+    def from_preset(cls, preset: Literal['local', 'remote', 'tiny', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'pythia_test_layers', 'qwen3_4b']) -> 'QuantumConfig':
         """
         Create config from preset name
 
         Args:
-            preset: One of 'local', 'remote', 'tiny', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'qwen3_4b'
+            preset: One of 'local', 'remote', 'tiny', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'pythia_test_layers', 'qwen3_4b'
 
         Returns:
             QuantumConfig instance
@@ -321,6 +342,7 @@ class QuantumConfig:
             'qwen_test_layers': cls.qwen_test_layers,
             'qwen_remote': cls.qwen_remote,
             'pythia_410m': cls.pythia_410m,
+            'pythia_test_layers': cls.pythia_test_layers,
             'qwen3_4b': cls.qwen3_4b,
         }
 

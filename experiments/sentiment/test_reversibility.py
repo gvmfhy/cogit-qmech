@@ -382,7 +382,7 @@ def main():
         '--preset',
         type=str,
         default='local',
-        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'qwen3_4b'],
+        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'pythia_test_layers', 'qwen3_4b'],
         help='Configuration preset'
     )
 
