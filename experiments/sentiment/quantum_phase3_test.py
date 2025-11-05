@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Quantum Phase 3: Test Interventions
-Apply trained unitary operators to GPT-2 generation
+Apply trained unitary operators to language model generation
 
 Usage:
     python experiments/sentiment/quantum_phase3_test.py --preset local
@@ -36,7 +36,21 @@ np.random.seed(42)
 
 
 class QuantumInterventionSystem:
-    """Test quantum interventions on GPT-2"""
+    """Test quantum interventions on language models"""
+
+    def log_gpu_memory(self, stage=""):
+        """Log current GPU memory usage"""
+        if torch.cuda.is_available():
+            allocated = torch.cuda.memory_allocated() / 1e9
+            reserved = torch.cuda.memory_reserved() / 1e9
+            free, total = torch.cuda.mem_get_info()
+            free_gb = free / 1e9
+            total_gb = total / 1e9
+
+            print(f"\n[GPU Memory {stage}]")
+            print(f"  Allocated: {allocated:.2f} GB")
+            print(f"  Reserved:  {reserved:.2f} GB")
+            print(f"  Free:      {free_gb:.2f} / {total_gb:.2f} GB")
 
     def __init__(self, config: QuantumConfig):
         self.config = config
@@ -48,19 +62,30 @@ class QuantumInterventionSystem:
         config.print_summary()
 
         # Load components
-        self.load_gpt2()
+        self.load_model()
+        self.log_gpu_memory("After model load")
+
         self.load_encoder()
         self.load_operators()
+        self.log_gpu_memory("After operators load")
+
         self.create_decoder()
 
-    def load_gpt2(self):
+    def load_model(self):
         """Load language model from config"""
         print(f"\n[Loading {self.config.model_name}]")
-        # Use CUDA if available, otherwise CPU (fixes GPU utilization bug)
+        # Use config device with auto-detection
         import torch
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        if self.config.device == 'auto':
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        elif self.config.device == 'mps':
+            print("⚠️  MPS has compatibility issues with TransformerLens, using CPU instead")
+            device = 'cpu'
+        else:
+            device = self.config.device
+
         self.adapter = TransformerLensAdapter(self.config.model_name, device)
-        print(f"✓ {self.config.model_name} loaded")
+        print(f"✓ {self.config.model_name} loaded on {device}")
 
     def load_encoder(self):
         """Load quantum encoder from Phase 1"""
@@ -78,6 +103,35 @@ class QuantumInterventionSystem:
         self.encoder = QuantumStateEncoder.load_from_saved(projection_file)
         print("✓ Encoder loaded")
 
+    def load_operator_smart(self, file_path: Path, quantum_dim: int, device='cuda'):
+        """
+        Load operator to GPU if memory available, else CPU
+
+        This is device-aware and checks available GPU memory before loading.
+        Critical for scaling from RTX 5090 (32GB) to H100 (80GB).
+        """
+        checkpoint = torch.load(file_path, map_location='cpu')
+        operator = UnitaryOperator(quantum_dim=quantum_dim)
+        operator.load_state_dict(checkpoint['model_state_dict'])
+
+        if device == 'cuda' and torch.cuda.is_available():
+            # Check available GPU memory
+            gpu_free_bytes, gpu_total_bytes = torch.cuda.mem_get_info()
+            operator_bytes = sum(p.numel() * p.element_size() for p in operator.parameters())
+
+            # 1.2× safety margin for fragmentation
+            if gpu_free_bytes > operator_bytes * 1.2:
+                operator.to(device)
+                print(f"  → Operator loaded to GPU ({operator_bytes/1e9:.2f} GB)")
+                return operator, 'cuda'
+            else:
+                print(f"  ⚠️ Insufficient GPU memory ({gpu_free_bytes/1e9:.2f} GB free, need {operator_bytes/1e9:.2f} GB)")
+                print(f"     Keeping operator on CPU (will be slower)")
+                return operator, 'cpu'
+        else:
+            print(f"  → Operator on CPU (device={device})")
+            return operator, 'cpu'
+
     def load_operators(self):
         """Load trained unitary operators from Phase 2"""
         print("\n[Loading Unitary Operators]")
@@ -92,18 +146,21 @@ class QuantumInterventionSystem:
                 "Operator U_pos→neg not found! Run Phase 2 first."
             )
 
-        # Load operators to CPU (7B model takes all GPU memory)
+        # Device-aware loading
         import torch
         device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # Read checkpoint to get quantum_dim
         checkpoint_pos_neg = torch.load(pos_neg_file, map_location='cpu')
         quantum_dim = checkpoint_pos_neg['config']['quantum_dim']
 
-        self.operator_pos_to_neg = UnitaryOperator(quantum_dim=quantum_dim)
-        self.operator_pos_to_neg.load_state_dict(checkpoint_pos_neg['model_state_dict'])
-        # Keep on CPU - too large for GPU alongside 7B model
+        # Smart loading with memory check
+        print(f"\nLoading U_pos→neg ({quantum_dim:,}-d):")
+        self.operator_pos_to_neg, self.operator_pos_device = self.load_operator_smart(
+            pos_neg_file, quantum_dim, device
+        )
         self.operator_pos_to_neg.eval()
-
-        print(f"✓ Loaded U_pos→neg ({quantum_dim:,}-d)")
+        print(f"✓ Loaded U_pos→neg on {self.operator_pos_device}")
 
         # Load U_neg→pos
         neg_pos_file = models_dir / f"unitary_neg_to_pos_{model_id}_latest.pt"
@@ -112,20 +169,18 @@ class QuantumInterventionSystem:
                 "Operator U_neg→pos not found! Run Phase 2 first."
             )
 
-        checkpoint_neg_pos = torch.load(neg_pos_file, map_location='cpu')
-
-        self.operator_neg_to_pos = UnitaryOperator(quantum_dim=quantum_dim)
-        self.operator_neg_to_pos.load_state_dict(checkpoint_neg_pos['model_state_dict'])
-        # Keep on CPU - too large for GPU alongside 7B model
+        print(f"\nLoading U_neg→pos ({quantum_dim:,}-d):")
+        self.operator_neg_to_pos, self.operator_neg_device = self.load_operator_smart(
+            neg_pos_file, quantum_dim, device
+        )
         self.operator_neg_to_pos.eval()
-
-        print(f"✓ Loaded U_neg→pos ({quantum_dim:,}-d)")
+        print(f"✓ Loaded U_neg→pos on {self.operator_neg_device}")
 
         # Verify unitarity
         is_unitary_pos, dev_pos = self.operator_pos_to_neg.verify_unitarity()
         is_unitary_neg, dev_neg = self.operator_neg_to_pos.verify_unitarity()
 
-        print(f"✓ U_pos→neg unitary: {is_unitary_pos} (deviation: {dev_pos:.6f})")
+        print(f"\n✓ U_pos→neg unitary: {is_unitary_pos} (deviation: {dev_pos:.6f})")
         print(f"✓ U_neg→pos unitary: {is_unitary_neg} (deviation: {dev_neg:.6f})")
 
     def create_decoder(self):
@@ -135,7 +190,7 @@ class QuantumInterventionSystem:
         print("✓ Decoder created")
 
     def run_baseline(self, prompt: str, max_tokens: int = 25) -> str:
-        """Run GPT-2 without intervention"""
+        """Run baseline generation without intervention"""
         tokens = self.adapter.model.to_tokens(prompt)
         output = self.adapter.model.generate(
             tokens,
@@ -159,7 +214,7 @@ class QuantumInterventionSystem:
         max_tokens: int = 25
     ) -> str:
         """
-        Run GPT-2 with quantum intervention
+        Run generation with quantum intervention
 
         Args:
             prompt: Input prompt
@@ -172,17 +227,28 @@ class QuantumInterventionSystem:
         """
 
         def quantum_intervention(activations, hook):
-            """Apply quantum operator to activations"""
+            """
+            Apply quantum operator to activations (device-aware)
 
-            # 1. Encode activation to quantum state (keep on CPU for operator)
+            This function is device-aware: it checks where the operator lives
+            and moves quantum states to that device for computation.
+            """
+
+            # Determine operator device
+            operator_device = next(operator.parameters()).device
+
+            # 1. Encode activation to quantum state (always starts on CPU)
             quantum_state = self.encoder.encode_activation(activations.cpu().numpy())
-            # Keep on CPU - operator is on CPU due to GPU memory constraints
 
-            # 2. Apply unitary operator (on CPU)
+            # 2. Move to operator's device if it's on GPU
+            if operator_device.type == 'cuda':
+                quantum_state = quantum_state.to(operator_device)
+
+            # 3. Apply unitary operator (on whatever device it lives)
             with torch.no_grad():
                 transformed_state = operator(quantum_state)
 
-            # 3. Blend in quantum space (optional)
+            # 4. Blend in quantum space (on same device as operator)
             if blend_ratio < 1.0:
                 blended_state = self.decoder.quantum_blend(
                     quantum_state,
@@ -192,20 +258,20 @@ class QuantumInterventionSystem:
             else:
                 blended_state = transformed_state
 
-            # 4. Decode back to activation space
+            # 5. Decode back to activation space (move to CPU for numpy conversion)
             decoded_activation = self.decoder.decode_quantum_state(
-                blended_state,
+                blended_state.cpu(),
                 method="real_component"
             )
 
-            # 5. Reshape to match original activation shape
+            # 6. Reshape to match original activation shape
             original_shape = activations.shape
             if len(original_shape) == 3:
                 batch_size, seq_len, dim = original_shape
                 decoded_activation = decoded_activation.unsqueeze(0).unsqueeze(0)
                 decoded_activation = decoded_activation.expand(batch_size, seq_len, dim)
 
-            # 6. Final gentle blend in activation space (optional extra control)
+            # 7. Final gentle blend in activation space (optional extra control)
             # This is insurance for coherence preservation
             gentle_blend = 0.5  # Extra damping
             final_activation = (

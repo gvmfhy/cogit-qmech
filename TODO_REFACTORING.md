@@ -9,27 +9,17 @@
 
 ---
 
-## 🔴 CRITICAL: Device-Aware Operator Loading
+## ✅ COMPLETE: Device-Aware Operator Loading
 
-**Problem:** `experiments/sentiment/quantum_phase3_test.py` hardcodes operators to CPU
+**Status:** ✅ Implemented in Decision #003 refactoring (2025-11-04)
 
-**Current code (lines 95-120):**
+**Problem (was):** `experiments/sentiment/quantum_phase3_test.py` hardcoded operators to CPU
+
+**Solution implemented (lines 81-108):**
+
+**Implemented code:**
 ```python
-# Hardcoded to CPU - WRONG for H100
-checkpoint = torch.load(pos_neg_file, map_location='cpu')
-operator = UnitaryOperator(quantum_dim)
-operator.load_state_dict(checkpoint['model_state_dict'])
-# No .to(device) call!
-```
-
-**Why it's broken:**
-- On RTX 5090 (32GB): 7B model + operators > 32GB → forced CPU fallback
-- On H100 (80GB): 7B model + operators = 33GB < 80GB → should use GPU!
-- Current code will use CPU even when GPU has space → 10-15× slower
-
-**Required fix:**
-```python
-def load_operator_smart(file_path, quantum_dim, device='cuda'):
+def load_operator_smart(self, file_path, quantum_dim, device='cuda'):
     """Load operator to GPU if memory available, else CPU"""
     checkpoint = torch.load(file_path, map_location='cpu')
     operator = UnitaryOperator(quantum_dim)

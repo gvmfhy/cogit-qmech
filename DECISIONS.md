@@ -438,5 +438,231 @@ Phase 1 & 2 completed successfully on RTX 5090, but Phase 3 revealed critical pe
 
 ---
 
-**Last Updated:** 2025-11-04 00:30 UTC
-**Decisions Logged:** 2
+## Decision #003: Model-Agnostic Refactoring & Progressive Pipeline
+
+**Date:** 2025-11-04
+**Time:** ~01:30 UTC
+**Context:** Preparing codebase for H100 deployment after RTX 5090 migration decision
+
+### The Problem
+
+Codebase had grown organically with several issues hindering scalability:
+
+1. **Model-specific naming:** 10+ references to "GPT-2" in code meant for any language model
+2. **Hardcoded device handling:** CPU hardcoded in Phase 1, inconsistent auto-detection elsewhere
+3. **Technical debt from RTX 5090:** CPU operator fallbacks that would break on H100
+4. **No systematic testing:** Developers running phases manually, risking errors
+5. **Lack of validation:** No automated checks between phases
+
+**Examples of model-specific code:**
+```python
+# quantum_phase1_collect.py:4
+"""Collect GPT-2 activations and encode as quantum states"""
+
+# quantum_phase3_test.py:39
+class QuantumInterventionSystem:
+    """Test quantum interventions on GPT-2"""
+
+# quantum_phase3_test.py:74
+def load_gpt2(self):  # Should be load_model()
+```
+
+**Risk:** Code appears GPT-2 specific even though it's model-agnostic. Confuses future researchers and makes Qwen2.5-7B work seem like an afterthought.
+
+---
+
+### Full Strategic Analysis
+
+#### What Makes an Experiment Robust?
+
+Based on lessons from RTX 5090 session:
+
+1. **Fail fast, fail loud:** Catch bugs in 2-minute tiny run before 2-hour qwen_remote run
+2. **Independent experiments:** Each preset generates its own data (different models = different distributions)
+3. **Validation between phases:** Don't waste GPU time if Phase 2 fidelity is <85%
+4. **Timestamp checking:** Prevent "using stale data" bugs (documented in TROUBLESHOOTING.md)
+5. **Auto-logging:** Append to EXPERIMENT_LOG.md on success (creates scientific record)
+
+#### Progressive Testing Strategy
+
+Instead of meta-orchestration (auto-run tiny → qwen_remote), use **single-preset pipelines:**
+
+```bash
+# Validation run (fast, cheap)
+python run_full_pipeline.py --preset tiny  # ~2-3 min
+
+# Production run (slow, expensive) - only if tiny passed
+python run_full_pipeline.py --preset qwen_remote  # ~20-30 min
+```
+
+**Why not auto-chain?**
+- Each scale is an independent experiment deserving its own EXPERIMENT_LOG entry
+- Researcher should inspect tiny results before committing to expensive runs
+- Explicit control over when to spend money
+
+---
+
+### Options Considered
+
+#### A) Fix only critical device bugs, skip refactoring
+- ✅ Faster (30 min vs 2 hrs)
+- ❌ Leaves confusing "GPT-2" references everywhere
+- ❌ No systematic testing workflow
+- ❌ Technical debt compounds
+
+#### B) Comprehensive refactoring + progressive pipeline
+- ✅ Clean, model-agnostic codebase
+- ✅ Systematic validation reduces bugs
+- ✅ Better for paper (shows generality)
+- ✅ Easier onboarding for future researchers
+- ❌ Takes 1-2 hours upfront
+- ❌ Risk of introducing bugs during refactoring
+
+#### C) Create pipeline only, leave naming as-is
+- ✅ Get systematic testing quickly
+- ❌ Still confusing for Qwen experiments
+- ❌ Half-measure
+
+---
+
+### Decision Made
+
+**Option B: Comprehensive refactoring + progressive pipeline**
+
+### Reasoning
+
+1. **Experimental robustness:** Progressive pipeline with validation prevents expensive failures
+2. **Scientific clarity:** Model-agnostic code shows framework applies to any LLM
+3. **Cost savings:** Catching bugs in 2-min tiny runs saves $1-2 per avoided qwen_remote failure
+4. **H100 readiness:** Device-aware code critical for 80GB deployment
+5. **Paper quality:** Demonstrates generality beyond GPT-2
+6. **Time investment pays off:** 2 hrs now saves 10+ hrs debugging over next week
+
+### Tradeoffs Accepted
+
+- **Time:** 1-2 hours refactoring vs 30 min quick fix
+  - Mitigation: Work is local on Mac, doesn't consume GPU credits
+- **Regression risk:** Refactoring might introduce bugs
+  - Mitigation: Test with `--preset tiny` before deployment
+
+---
+
+### Changes Made
+
+#### Part 1: Model-Agnostic Refactoring
+
+**quantum_phase1_collect.py:**
+- Line 4: "Collect GPT-2 activations" → "Collect language model activations"
+- Line 55: Removed hardcoded `device = 'cpu'`, use `config.device` with auto-detection
+- Line 129: "Extract GPT-2 activations" → "Extract language model activations"
+- Line 303: Updated argparse help for clarity
+
+**quantum_phase2_train.py:**
+- Line 416: "Test interventions on GPT-2" → "Test interventions on language model"
+- Line 427: Updated argparse help
+
+**quantum_phase3_test.py:**
+- Line 4: "Apply operators to GPT-2" → "Apply operators to language model generation"
+- Line 39: "Test interventions on GPT-2" → "Test interventions on language models"
+- Line 74: `def load_gpt2()` → `def load_model()`
+- Line 65: Updated call to `self.load_model()`
+- Line 79: Use `config.device` instead of auto-detect (consistency with Phase 1)
+- Line 81-120: Added `load_operator_smart()` with device-aware memory checking
+- Line 210-257: Updated `quantum_intervention()` to be device-aware
+- Line 41-53: Added `log_gpu_memory()` for tracking
+
+**Device-aware operator loading:**
+```python
+def load_operator_smart(self, file_path, quantum_dim, device='cuda'):
+    """Load operator to GPU if memory available, else CPU"""
+    checkpoint = torch.load(file_path, map_location='cpu')
+    operator = UnitaryOperator(quantum_dim)
+    operator.load_state_dict(checkpoint['model_state_dict'])
+
+    if device == 'cuda' and torch.cuda.is_available():
+        gpu_free_bytes, _ = torch.cuda.mem_get_info()
+        operator_bytes = sum(p.numel() * p.element_size() for p in operator.parameters())
+
+        if gpu_free_bytes > operator_bytes * 1.2:  # 20% safety margin
+            operator.to(device)
+            return operator, 'cuda'
+    return operator, 'cpu'
+```
+
+#### Part 2: Progressive Pipeline
+
+**New file: `experiments/sentiment/run_full_pipeline.py`**
+
+Features:
+- Accepts `--preset` argument (tiny, qwen_tiny, qwen_remote, etc.)
+- Runs Phases 1→2→3→4 sequentially with validation:
+  - Phase 1: Check quantum states generated
+  - Phase 2: Verify fidelity > 0.85 (fail if not)
+  - Phase 3: Check results JSON created
+  - Phase 4: Check reversibility results
+- Data freshness handling:
+  - Check if Phase 1 data exists
+  - If < 1 hour old: prompt "Reuse or regenerate?"
+  - If stale or missing: run Phase 1
+- Tracks timing for each phase
+- Calculates total cost (for remote presets)
+- Auto-appends to EXPERIMENT_LOG.md on success (TODO)
+- Fails fast on any error (no partial results)
+
+**Example usage:**
+```bash
+# Fast validation (2-3 min, free on Mac)
+python experiments/sentiment/run_full_pipeline.py --preset tiny
+
+# Production run (20-30 min, ~$0.50 on H100)
+python experiments/sentiment/run_full_pipeline.py --preset qwen_remote
+```
+
+---
+
+### Technical Debt Resolved
+
+**From TODO_REFACTORING.md:**
+- ✅ Device-aware operator loading (Phase 3)
+- ✅ Device-aware intervention function (Phase 3)
+- ✅ GPU memory profiling (log_gpu_memory)
+- ✅ Model-agnostic naming (all phases)
+- ✅ Consistent device handling (all phases)
+
+**Remaining debt:**
+- ⏳ Test on actual H100 to validate GPU operator loading
+- ⏳ Add EXPERIMENT_LOG.md auto-append functionality
+
+---
+
+### Validation Criteria
+
+**How we'll know this was the right decision:**
+
+1. **Local `--preset tiny` passes all 4 phases** (validates no regressions)
+2. **H100 operators load to GPU** (validates device-aware code works)
+3. **Phase times logged accurately** (enables cost/performance analysis)
+4. **Code reads cleanly** (no GPT-2 confusion for Qwen experiments)
+5. **Future experiments use pipeline** (proves it's useful)
+
+### Future Implications
+
+**For 70B experiments:**
+- Progressive pipeline catches compatibility issues early
+- Device-aware code handles >140GB model requirements
+- Model-agnostic naming makes adding new models trivial
+
+**For paper writing:**
+- Clean code shows framework generality
+- Progressive testing demonstrates robustness
+- Timing data provides performance comparisons
+
+**For collaboration:**
+- New researchers can understand codebase faster
+- Pipeline provides standardized experimental workflow
+- Documentation shows decision-making process
+
+---
+
+**Last Updated:** 2025-11-04 01:30 UTC
+**Decisions Logged:** 3

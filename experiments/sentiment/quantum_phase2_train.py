@@ -413,7 +413,7 @@ def run_phase2(preset: str = 'local'):
     print(f"  ✓ Reversibility tested")
 
     print(f"\nNext Steps:")
-    print(f"  → Phase 3: Test interventions on GPT-2")
+    print(f"  → Phase 3: Test interventions on language model")
     print(f"  → python experiments/sentiment/quantum_phase3_test.py --preset {preset}")
 
 
@@ -424,7 +424,7 @@ def main():
         type=str,
         default='local',
         choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote'],
-        help='Configuration preset (tiny/local/remote=GPT-2, qwen_*=Qwen2.5-3B/7B)'
+        help='Configuration preset (tiny/local/remote for GPT-2 124M, qwen_tiny/qwen_local for Qwen2.5-3B, qwen_remote for Qwen2.5-7B)'
     )
 
     args = parser.parse_args()

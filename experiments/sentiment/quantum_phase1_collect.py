@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Quantum Phase 1: Data Collection
-Collect GPT-2 activations and encode as complex quantum states
+Collect language model activations and encode as complex quantum states
 
 Usage:
     python experiments/sentiment/quantum_phase1_collect.py --preset local
@@ -52,7 +52,16 @@ class QuantumDataCollector:
 
         # Load model
         print(f"\n[Loading {config.model_name} with TransformerLens]")
-        device = 'cpu'  # Always use CPU for inference (MPS has some issues with TransformerLens)
+        # Use config device, but avoid MPS (TransformerLens has compatibility issues)
+        import torch
+        if config.device == 'auto':
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        elif config.device == 'mps':
+            print("⚠️  MPS has compatibility issues with TransformerLens, using CPU instead")
+            device = 'cpu'
+        else:
+            device = config.device
+
         self.adapter = TransformerLensAdapter(config.model_name, device)
         print(f"✓ Model loaded on {device}")
 
@@ -117,7 +126,7 @@ class QuantumDataCollector:
         ][:self.config.num_prompts]
 
     def collect_activations(self) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-        """Extract GPT-2 activations from prompts"""
+        """Extract language model activations from prompts"""
 
         print(f"\n[Extracting Activations from Layer {self.config.target_layer}]")
 
@@ -291,7 +300,7 @@ def main():
         type=str,
         default='local',
         choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote'],
-        help='Configuration preset (tiny/local/remote=GPT-2, qwen_tiny/qwen_local/qwen_remote/qwen_test_layers=Qwen2.5-3B/7B)'
+        help='Configuration preset (tiny/local/remote for GPT-2 124M, qwen_tiny/qwen_local for Qwen2.5-3B, qwen_remote for Qwen2.5-7B)'
     )
 
     args = parser.parse_args()
