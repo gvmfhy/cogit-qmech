@@ -162,8 +162,11 @@ class QuantumStateEncoder:
         print(f"\n  [Quantum Separation Analysis]")
 
         # Convert to tensors for batch operations
-        pos_batch = torch.stack([state.to(self.device) for state in positive_states])
-        neg_batch = torch.stack([state.to(self.device) for state in negative_states])
+        positive_states_device = [state.to(self.device) for state in positive_states]
+        negative_states_device = [state.to(self.device) for state in negative_states]
+
+        pos_batch = torch.stack(positive_states_device)
+        neg_batch = torch.stack(negative_states_device)
 
         # Compute centroids (mean quantum states)
         pos_centroid = normalize_state(pos_batch.mean(dim=0))
@@ -181,20 +184,20 @@ class QuantumStateEncoder:
 
         # Average fidelity within each class (consistency)
         pos_fidelities = []
-        for state in positive_states[:10]:  # Sample for speed
+        for state in positive_states_device[:10]:  # Sample for speed
             f = quantum_fidelity(state, pos_centroid)
             pos_fidelities.append(f.item())
 
         neg_fidelities = []
-        for state in negative_states[:10]:
+        for state in negative_states_device[:10]:
             f = quantum_fidelity(state, neg_centroid)
             neg_fidelities.append(f.item())
 
         # Cross-class fidelity (should be lower)
         cross_fidelities = []
-        for i in range(min(10, len(positive_states))):
-            for j in range(min(10, len(negative_states))):
-                f = quantum_fidelity(positive_states[i], negative_states[j])
+        for i in range(min(10, len(positive_states_device))):
+            for j in range(min(10, len(negative_states_device))):
+                f = quantum_fidelity(positive_states_device[i], negative_states_device[j])
                 cross_fidelities.append(f.item())
 
         stats = {
