@@ -112,11 +112,18 @@ def diagnose_magnitudes():
             'quantum_pos_to_neg'
         )
 
-    system.adapter.run_with_hooks(
-        test_prompt,
-        fwd_hooks=[(f"blocks.{config.target_layer}.hook_resid_post", pos_to_neg_hook)],
-        max_new_tokens=max_tokens
-    )
+    hook_name = f"blocks.{config.target_layer}.hook_resid_post"
+    tokens = system.adapter.model.to_tokens(test_prompt)
+
+    with system.adapter.model.hooks(fwd_hooks=[(hook_name, pos_to_neg_hook)]):
+        system.adapter.model.generate(
+            tokens,
+            max_new_tokens=max_tokens,
+            temperature=0.8,
+            top_k=50,
+            stop_at_eos=True,
+            verbose=False
+        )
 
     # Test with neg_to_pos operator
     print("\n" + "-" * 70)
@@ -131,11 +138,17 @@ def diagnose_magnitudes():
             'quantum_neg_to_pos'
         )
 
-    system.adapter.run_with_hooks(
-        test_prompt,
-        fwd_hooks=[(f"blocks.{config.target_layer}.hook_resid_post", neg_to_pos_hook)],
-        max_new_tokens=max_tokens
-    )
+    tokens = system.adapter.model.to_tokens(test_prompt)
+
+    with system.adapter.model.hooks(fwd_hooks=[(hook_name, neg_to_pos_hook)]):
+        system.adapter.model.generate(
+            tokens,
+            max_new_tokens=max_tokens,
+            temperature=0.8,
+            top_k=50,
+            stop_at_eos=True,
+            verbose=False
+        )
 
     # Print summary
     print("\n" + "=" * 70)
