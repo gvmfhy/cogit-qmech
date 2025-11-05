@@ -13,7 +13,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import argparse
 
 # Set deterministic hashing
@@ -41,8 +41,11 @@ np.random.seed(42)
 class QuantumDataCollector:
     """Collect activations and encode as quantum states"""
 
-    def __init__(self, config: QuantumConfig):
+    def __init__(self, config: QuantumConfig, prompts_path: Optional[Path] = None, num_prompts_override: Optional[int] = None, quantum_ratio: Optional[float] = None):
         self.config = config
+        self._prompts_path = prompts_path
+        self._num_prompts_override = num_prompts_override
+        self._quantum_ratio_override = quantum_ratio
 
         print("\n" + "=" * 70)
         print("QUANTUM PHASE 1: DATA COLLECTION")
@@ -72,6 +75,13 @@ class QuantumDataCollector:
             print(f"  Using model's hidden_dim: {self.adapter.hidden_dim}")
             config.input_dim = self.adapter.hidden_dim
 
+        # Optional: override quantum_dim from ratio once input_dim is known
+        if self._quantum_ratio_override is not None and self._quantum_ratio_override > 0:
+            new_qdim = int(round(config.input_dim * self._quantum_ratio_override))
+            if new_qdim != config.quantum_dim:
+                print(f"  → Overriding quantum_dim via ratio {self._quantum_ratio_override} → {new_qdim}")
+                config.quantum_dim = new_qdim
+
         # Create quantum encoder
         print("\n[Creating Quantum State Encoder]")
         self.encoder = QuantumStateEncoder(
@@ -86,8 +96,12 @@ class QuantumDataCollector:
 
     def load_prompts(self):
         """Load diverse prompts from file or generate new ones"""
-        # Try prompts/ directory first (version controlled)
-        prompt_file = ROOT / "prompts" / "diverse_prompts_50.json"
+        # Prefer explicitly provided prompts path
+        if self._prompts_path is not None:
+            prompt_file = self._prompts_path
+        else:
+            # Try prompts/ directory first (version controlled)
+            prompt_file = ROOT / "prompts" / "diverse_prompts_50.json"
 
         # Fallback to data/ directory (legacy location)
         if not prompt_file.exists():
@@ -98,8 +112,9 @@ class QuantumDataCollector:
             with open(prompt_file, 'r') as f:
                 data = json.load(f)
 
-            self.positive_prompts = data['positive_prompts'][:self.config.num_prompts]
-            self.negative_prompts = data['negative_prompts'][:self.config.num_prompts]
+            n = self._num_prompts_override or self.config.num_prompts
+            self.positive_prompts = data.get('positive_prompts', [])[:n]
+            self.negative_prompts = data.get('negative_prompts', [])[:n]
 
             print(f"✓ Loaded {len(self.positive_prompts)} positive prompts")
             print(f"✓ Loaded {len(self.negative_prompts)} negative prompts")
@@ -115,17 +130,18 @@ class QuantumDataCollector:
 
     def generate_simple_prompts(self):
         """Generate simple prompts if diverse ones aren't available"""
+        n = self._num_prompts_override or self.config.num_prompts
         self.positive_prompts = [
             f"I love {word}, it is so" for word in
             ["puppies", "sunshine", "chocolate", "music", "friends",
              "laughter", "success", "joy", "peace", "happiness"]
-        ][:self.config.num_prompts]
+        ][:n]
 
         self.negative_prompts = [
             f"I hate {word}, it is so" for word in
             ["traffic", "delays", "errors", "problems", "failures",
              "sadness", "pain", "loss", "anger", "frustration"]
-        ][:self.config.num_prompts]
+        ][:n]
 
     def collect_activations(self) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         """Extract language model activations from prompts"""
@@ -321,7 +337,7 @@ class QuantumDataCollector:
         return output_file
 
 
-def run_phase1(preset: str = 'local'):
+def run_phase1(preset: str = 'local', *, prompts_path: Optional[str] = None, num_prompts: Optional[int] = None):
     """Run Phase 1 data collection"""
 
     # Load configuration
@@ -329,12 +345,12 @@ def run_phase1(preset: str = 'local'):
 
     # Check if this is a layer sweep
     if hasattr(config, 'test_layers') and config.test_layers is not None:
-        return run_layer_sweep(config, preset)
+        return run_layer_sweep(config, preset, prompts_path=prompts_path, num_prompts=num_prompts)
     else:
-        return run_single_layer(config, preset)
+        return run_single_layer(config, preset, prompts_path=prompts_path, num_prompts=num_prompts)
 
 
-def run_layer_sweep(config: QuantumConfig, preset: str):
+def run_layer_sweep(config: QuantumConfig, preset: str, *, prompts_path: Optional[str] = None, num_prompts: Optional[int] = None):
     """Run Phase 1 for multiple layers to find optimal separation"""
 
     print("\n" + "=" * 70)
@@ -355,7 +371,11 @@ def run_layer_sweep(config: QuantumConfig, preset: str):
         layer_config.target_layer = layer_idx
 
         # Create collector for this layer
-        collector = QuantumDataCollector(layer_config)
+        collector = QuantumDataCollector(
+            layer_config,
+            prompts_path=Path(prompts_path) if prompts_path else None,
+            num_prompts_override=num_prompts
+        )
 
         # Collect activations at this layer
         pos_acts, neg_acts = collector.collect_activations()
@@ -423,11 +443,15 @@ def run_layer_sweep(config: QuantumConfig, preset: str):
     return best_result['output_file']
 
 
-def run_single_layer(config: QuantumConfig, preset: str):
+def run_single_layer(config: QuantumConfig, preset: str, *, prompts_path: Optional[str] = None, num_prompts: Optional[int] = None):
     """Run Phase 1 for a single layer (original behavior)"""
 
     # Create collector
-    collector = QuantumDataCollector(config)
+    collector = QuantumDataCollector(
+        config,
+        prompts_path=Path(prompts_path) if prompts_path else None,
+        num_prompts_override=num_prompts
+    )
 
     # Collect activations
     pos_acts, neg_acts = collector.collect_activations()
@@ -464,11 +488,42 @@ def main():
         choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'pythia_test_layers', 'qwen3_4b', 'qwen3_4b_test_layers'],
         help='Configuration preset (tiny/local/remote for GPT-2 124M, qwen_tiny/qwen_local for Qwen2.5-3B, qwen_remote for Qwen2.5-7B)'
     )
+    parser.add_argument('--prompts', type=str, default='', help='Path to prompts JSON (expects positive_prompts and negative_prompts)')
+    parser.add_argument('--num-prompts', type=int, default=0, help='Override number of prompts to load per class')
+    parser.add_argument('--model', type=str, default='', help='Override model name (e.g., EleutherAI/pythia-410m, Qwen/Qwen2.5-3B-Instruct)')
+    parser.add_argument('--quantum-dim', type=int, default=0, help='Override quantum dimension directly')
+    parser.add_argument('--quantum-ratio', type=float, default=0.0, help='Set quantum_dim = round(input_dim * quantum_ratio)')
 
     args = parser.parse_args()
 
     print(f"\nRunning Phase 1 with preset: {args.preset.upper()}")
-    run_phase1(preset=args.preset)
+    # Allow model and quantum dim overrides via CLI
+    cfg = QuantumConfig.from_preset(args.preset)
+    if args.model:
+        cfg.model_name = args.model
+    if args.quantum_dim and args.quantum_dim > 0:
+        cfg.quantum_dim = args.quantum_dim
+
+    # Execute with overrides
+    quantum_ratio = args.quantum_ratio if args.quantum_ratio and args.quantum_ratio > 0 else None
+    # We need to pass a config instance, so call run_single_layer/run_layer_sweep directly
+    if hasattr(cfg, 'test_layers') and cfg.test_layers is not None:
+        run_layer_sweep(
+            cfg,
+            preset=args.preset,
+            prompts_path=args.prompts if args.prompts else None,
+            num_prompts=args.num_prompts if args.num_prompts and args.num_prompts > 0 else None,
+        )
+    else:
+        collector = QuantumDataCollector(
+            cfg,
+            prompts_path=Path(args.prompts) if args.prompts else None,
+            num_prompts_override=args.num_prompts if args.num_prompts and args.num_prompts > 0 else None,
+            quantum_ratio=quantum_ratio,
+        )
+        pos_acts, neg_acts = collector.collect_activations()
+        pos_q, neg_q, stats = collector.encode_to_quantum_states(pos_acts, neg_acts)
+        collector.save_quantum_data(pos_q, neg_q, stats)
 
 
 if __name__ == "__main__":

@@ -34,13 +34,28 @@ from config import QuantumConfig
 class PipelineRunner:
     """Orchestrate full experimental pipeline with validation"""
 
-    def __init__(self, preset: str, auto_yes: bool = False):
+    def __init__(self, preset: str, auto_yes: bool = False, *,
+                 prompts: str = "", neutral_prompts: str = "",
+                 blend_ratio: float = None, blend_ratios: list | None = None, max_tokens: int = None,
+                 decode_method: str = None, num_prompts: int = None,
+                 model: str = None, quantum_dim: int = None,
+                 quantum_ratio: float = None):
         self.preset = preset
         self.config = QuantumConfig.from_preset(preset)
         self.start_time = time.time()
         self.phase_times = {}
         self.results = {}
         self.auto_yes = auto_yes
+        self.prompts = prompts
+        self.neutral_prompts = neutral_prompts
+        self.blend_ratio = blend_ratio
+        self.blend_ratios = blend_ratios or None
+        self.max_tokens = max_tokens
+        self.decode_method = decode_method
+        self.num_prompts = num_prompts
+        self.model = model
+        self.quantum_dim = quantum_dim
+        self.quantum_ratio = quantum_ratio
 
         print("\n" + "=" * 70)
         print(f"COGIT-QMECH FULL PIPELINE: {preset.upper()}")
@@ -117,6 +132,49 @@ class PipelineRunner:
             str(script_path),
             "--preset", self.preset
         ]
+
+        # Forward common options based on phase
+        if script_name == "quantum_phase1_collect.py":
+            if self.prompts:
+                cmd += ["--prompts", self.prompts]
+            if self.num_prompts:
+                cmd += ["--num-prompts", str(self.num_prompts)]
+            if self.model:
+                cmd += ["--model", self.model]
+            if self.quantum_dim:
+                cmd += ["--quantum-dim", str(self.quantum_dim)]
+            if self.quantum_ratio:
+                cmd += ["--quantum-ratio", str(self.quantum_ratio)]
+        elif script_name == "quantum_phase3_test.py":
+            if self.prompts:
+                cmd += ["--prompts", self.prompts]
+            if self.num_prompts:
+                cmd += ["--num-prompts", str(self.num_prompts)]
+            if self.max_tokens:
+                cmd += ["--max-tokens", str(self.max_tokens)]
+            # Optionally pass blend ratios as single value if provided
+            if self.blend_ratios is not None and len(self.blend_ratios) > 0:
+                ratios_str = ",".join(str(x) for x in self.blend_ratios)
+                cmd += ["--blend-ratios", ratios_str]
+            elif self.blend_ratio is not None:
+                cmd += ["--blend-ratios", str(self.blend_ratio)]
+            if self.model:
+                cmd += ["--model", self.model]
+        elif script_name == "evaluate_quantum_intervention.py":
+            if self.prompts:
+                cmd += ["--prompts", self.prompts]
+            if self.neutral_prompts:
+                cmd += ["--neutral-prompts", self.neutral_prompts]
+            if self.num_prompts:
+                cmd += ["--num-prompts", str(self.num_prompts)]
+            if self.max_tokens:
+                cmd += ["--max-tokens", str(self.max_tokens)]
+            if self.decode_method:
+                cmd += ["--decode-method", self.decode_method]
+            if self.blend_ratio is not None:
+                cmd += ["--blend-ratio", str(self.blend_ratio)]
+            if self.model:
+                cmd += ["--model", self.model]
 
         # Set unbuffered env
         env = os.environ.copy()
@@ -219,15 +277,16 @@ class PipelineRunner:
         return True
 
     def validate_phase4(self) -> bool:
-        """Validate Phase 4 outputs"""
-        results_dir = ROOT / self.config.results_dir
-        reversibility_file = results_dir / "reversibility_test_latest.json"
-
-        if not reversibility_file.exists():
-            print(f"❌ Validation failed: {reversibility_file} not found")
+        """Validate Phase 4 outputs (evaluation results present)"""
+        eval_dir = ROOT / "results" / "quantum_intervention"
+        if not eval_dir.exists():
+            print(f"❌ Validation failed: {eval_dir} not found")
             return False
-
-        print(f"✓ Phase 4 validation passed")
+        json_files = sorted(eval_dir.glob("evaluation_*.json"))
+        if not json_files:
+            print(f"❌ Validation failed: no evaluation_*.json found in {eval_dir}")
+            return False
+        print(f"✓ Phase 4 validation passed ({json_files[-1].name})")
         return True
 
     def run_pipeline(self) -> bool:
@@ -306,10 +365,63 @@ def main():
         action='store_true',
         help='Automatically reuse existing Phase 1 data without prompting'
     )
+    parser.add_argument('--prompts', type=str, default='', help='Path to main prompts JSON (pos+neg)')
+    parser.add_argument('--neutral-prompts', type=str, default='', help='Optional path to neutral prompts JSON')
+    parser.add_argument('--blend-ratio', type=float, default=None, help='Blend ratio for interventions/evaluation')
+    parser.add_argument('--blend-ratios', type=str, default='', help='Comma-separated list for Phase 3 sweep')
+    parser.add_argument('--max-tokens', type=int, default=None, help='Max new tokens for generation')
+    parser.add_argument('--decode-method', type=str, default=None, choices=[
+        'real_component', 'real_imag_avg', 'absolute', 'magnitude'
+    ], help='Decoding method for evaluator')
+    parser.add_argument('--num-prompts', type=int, default=None, help='Num prompts to use (where applicable)')
+    parser.add_argument('--model', type=str, default=None, help='Override model name')
+    parser.add_argument('--quantum-dim', type=int, default=None, help='Override quantum dimension for Phase 1')
+    parser.add_argument('--quantum-ratio', type=float, default=None, help='Set quantum_dim = round(input_dim * ratio) in Phase 1')
+    parser.add_argument('--study-config', type=str, default='', help='JSON file describing a study configuration')
 
     args = parser.parse_args()
 
-    runner = PipelineRunner(args.preset, auto_yes=args.yes)
+    # Optionally load study config and overlay CLI
+    study = {}
+    if args.study_config:
+        try:
+            with open(args.study_config, 'r') as f:
+                study = json.load(f)
+        except Exception as e:
+            print(f"⚠️  Could not read study config {args.study_config}: {e}")
+            study = {}
+
+    def pick(key, cli_val, default=None):
+        return cli_val if cli_val not in (None, '', []) else study.get(key, default)
+
+    blend_ratios = None
+    if args.blend_ratios:
+        try:
+            blend_ratios = [float(x.strip()) for x in args.blend_ratios.split(',') if x.strip()]
+        except ValueError:
+            blend_ratios = None
+    else:
+        br_list = study.get('blend_ratios')
+        if isinstance(br_list, list):
+            try:
+                blend_ratios = [float(x) for x in br_list]
+            except Exception:
+                blend_ratios = None
+
+    runner = PipelineRunner(
+        pick('preset', args.preset),
+        auto_yes=args.yes,
+        prompts=pick('prompts', args.prompts, ''),
+        neutral_prompts=pick('neutral_prompts', args.neutral_prompts, ''),
+        blend_ratio=pick('blend_ratio', args.blend_ratio),
+        blend_ratios=blend_ratios,
+        max_tokens=pick('max_tokens', args.max_tokens),
+        decode_method=pick('decode_method', args.decode_method),
+        num_prompts=pick('num_prompts', args.num_prompts),
+        model=pick('model', args.model),
+        quantum_dim=pick('quantum_dim', args.quantum_dim),
+        quantum_ratio=pick('quantum_ratio', args.quantum_ratio),
+    )
 
     success = runner.run_pipeline()
 

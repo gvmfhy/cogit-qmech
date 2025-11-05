@@ -59,8 +59,10 @@ class QuantumStateDecoder:
         Args:
             quantum_state: Complex quantum state (shape: [quantum_dim] or [batch, quantum_dim])
             method: Decoding method
-                   - "real_component": Take real part after projection
-                   - "absolute": Take absolute value after projection
+                   - "real_component": Take real part after projection (default, baseline)
+                   - "absolute": Take absolute value (magnitude only)
+                   - "real_imag_avg": Average of real and imaginary parts (preserves both)
+                   - "magnitude": Same as "absolute" (alias)
                    - "born_rule": Sample based on Born rule probabilities
 
         Returns:
@@ -77,11 +79,17 @@ class QuantumStateDecoder:
 
         # Convert complex to real based on method
         if method == "real_component":
-            # Take real component (most common approach)
+            # Take real component (baseline - discards imaginary)
             activation = reconstructed_complex.real
 
-        elif method == "absolute":
-            # Take absolute value (preserves magnitude info)
+        elif method == "real_imag_avg":
+            # Average real and imaginary (preserves information from both)
+            # This uses 100% of the complex state instead of 50%
+            activation = (reconstructed_complex.real + reconstructed_complex.imag) / 2
+
+        elif method == "absolute" or method == "magnitude":
+            # Take absolute value (preserves magnitude, loses phase)
+            # |a + bi| = sqrt(a² + b²)
             activation = torch.abs(reconstructed_complex)
 
         elif method == "born_rule":
@@ -91,7 +99,8 @@ class QuantumStateDecoder:
             activation = torch.abs(reconstructed_complex)
 
         else:
-            raise ValueError(f"Unknown decoding method: {method}")
+            raise ValueError(f"Unknown decoding method: {method}. Choose from: "
+                           f"real_component, real_imag_avg, absolute, magnitude, born_rule")
 
         return activation
 

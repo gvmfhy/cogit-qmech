@@ -6,6 +6,64 @@
 
 ---
 
+## 2025-11-05 – Prompt Quality Improvement & Evaluative Word Balance
+
+### Problem Identified
+Initial prompts (`diverse_prompts_50.json`) had critical issues preventing strong steering signal:
+1. **Too short:** 15-25 tokens, sentence fragments ending with "and/since/because"
+2. **Valence leakage:** Leading words like "wonderful/terrible" biased baseline and reduced lift ceiling
+3. **Template-heavy:** Generic openers ("How wonderful that...", "Why does everything...") instead of concrete situations
+4. **Unbalanced evaluative vocabulary:** 8 positive vs 9 negative explicit sentiment words
+5. **No topic mirroring:** Difficult to measure within-topic steering effects
+
+### Root Cause
+Short, template-based prompts with leading valence words:
+- Provide insufficient context for model to build rich sentiment representations
+- Pre-bias baseline sentiment distribution, reducing measurable steering lift
+- Generate shallow continuations with weak polarity strength
+- Create ceiling effects where steering can't improve already-biased outputs
+
+### Solution Implemented
+Created `improved_prompts_100.json` with:
+1. **3-sentence structure:** Context → Specific sentiment → Human reflection/reasoning
+2. **3× longer:** 50-60 tokens per prompt (vs 15-25 in v1)
+3. **Removed valence scaffolding:** Sentiment emerges from concrete situations, not labels
+4. **Balanced evaluative words:** Exactly 8 positive : 8 negative explicit sentiment terms
+5. **Natural human complexity:** Mixed emotions, nuanced reasoning, realistic scenarios
+6. **Diverse domains:** Work, family, health, consumer, civic, creative (balanced across classes)
+
+### Evaluative Word Balance Achieved
+**Positive (8 instances):**
+- grateful (2×), hopeful (1×), delightful (1×), beautiful/beautifully (2×), excellent (1×), delicious (1×)
+
+**Negative (8 instances):**
+- exhausting (2×), infuriating (1×), frustrating (2×), agonizing (1×), unbearable (1×), traumatic (1×)
+
+**Change made:** Line 56 "exhausting" → "weighs on me constantly" to eliminate 3rd instance and achieve 8:8 balance
+
+### Expected Impact
+1. **Stronger separation:** 3× more tokens → 3× more signal for quantum encoding
+2. **Cleaner baseline:** No valence leakage → unbiased baseline for measuring lift
+3. **Higher classifier confidence:** Concrete situations → stronger polarity → better labeler agreement
+4. **Better steering effects:** Richer representations → more effective unitary rotations
+5. **Reduced ceiling effects:** Neutral baseline → more room for steering to demonstrate effect
+
+### Next Steps
+1. ✅ Use `improved_prompts_100.json` for all Phase 1/3/4 experiments
+2. ⏳ Measure baseline skew (target: 45-55% positive without steering)
+3. ⏳ Create topic-pair index for within-topic lift measurement
+4. ⏳ Optional: Instruct-model variant with light scaffolding for length control
+
+### Files Changed
+- `/prompts/improved_prompts_100.json` (created, 100 prompts with balanced evaluative vocabulary)
+- `/prompts/PROMPT_AUDIT_REPORT.md` (created, detailed audit documentation)
+
+### References
+- Audit report: `prompts/PROMPT_AUDIT_REPORT.md`
+- Original prompts: `prompts/diverse_prompts_50.json` (deprecated for experiments)
+
+---
+
 ## Purpose of This Document
 
 This document captures a critical mindset shift in the project: **from scientific validation to engineering iteration**. After deploying Qwen2.5-7B on H200 and observing mixed intervention results, we analyzed the framework to distinguish between:
