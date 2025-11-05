@@ -100,6 +100,7 @@ class QuantumInterventionSystem:
 
         self.operator_pos_to_neg = UnitaryOperator(quantum_dim=quantum_dim)
         self.operator_pos_to_neg.load_state_dict(checkpoint_pos_neg['model_state_dict'])
+        self.operator_pos_to_neg.to(device)  # Move operator to GPU
         self.operator_pos_to_neg.eval()
 
         print(f"✓ Loaded U_pos→neg ({quantum_dim:,}-d)")
@@ -115,6 +116,7 @@ class QuantumInterventionSystem:
 
         self.operator_neg_to_pos = UnitaryOperator(quantum_dim=quantum_dim)
         self.operator_neg_to_pos.load_state_dict(checkpoint_neg_pos['model_state_dict'])
+        self.operator_neg_to_pos.to(device)  # Move operator to GPU
         self.operator_neg_to_pos.eval()
 
         print(f"✓ Loaded U_neg→pos ({quantum_dim:,}-d)")
