@@ -30,7 +30,7 @@ import numpy as np
 
 # Import quantum components
 from src.quantum_encoder import QuantumStateEncoder
-from src.model_adapter_tl import TransformerLensAdapter
+from src.model_adapter_tl import ModelAdapterFactory
 from config import QuantumConfig
 
 # Deterministic seeding
@@ -62,8 +62,9 @@ class QuantumDataCollector:
         else:
             device = config.device
 
-        self.adapter = TransformerLensAdapter(config.model_name, device)
+        self.adapter = ModelAdapterFactory.create_adapter(config.model_name, device)
         print(f"✓ Model loaded on {device}")
+        self.device = torch.device(device)
 
         # Validate config input_dim matches model
         if config.input_dim != self.adapter.hidden_dim:
@@ -76,7 +77,8 @@ class QuantumDataCollector:
         self.encoder = QuantumStateEncoder(
             input_dim=config.input_dim,
             quantum_dim=config.quantum_dim,
-            seed=config.seed
+            seed=config.seed,
+            device=self.device
         )
 
         # Load or generate prompts

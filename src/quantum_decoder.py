@@ -6,7 +6,7 @@ Converts complex quantum states back to real-valued activations for GPT-2 inject
 
 import torch
 import numpy as np
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 from src.quantum_utils import quantum_fidelity, normalize_state
 
@@ -36,6 +36,7 @@ class QuantumStateDecoder:
         self.projection = encoder_projection
         self.input_dim = encoder_projection.shape[0]
         self.quantum_dim = encoder_projection.shape[1]
+        self.device = encoder_projection.device
 
         print(f"[Quantum State Decoder]")
         print(f"  Quantum states: {self.quantum_dim}-d (complex)")
@@ -43,7 +44,7 @@ class QuantumStateDecoder:
 
         # Compute pseudoinverse for decoding
         # activation ≈ quantum_state @ projection†
-        self.inverse_projection = torch.linalg.pinv(encoder_projection)
+        self.inverse_projection = torch.linalg.pinv(encoder_projection).to(torch.complex64)
 
         print(f"  ✓ Pseudoinverse computed: {self.inverse_projection.shape}")
 
@@ -67,6 +68,8 @@ class QuantumStateDecoder:
         """
         # Project back to activation space
         # activation = quantum_state @ inverse_projection
+        quantum_state = quantum_state.to(self.device)
+
         if quantum_state.dim() == 1:
             reconstructed_complex = torch.matmul(quantum_state, self.inverse_projection)
         else:
@@ -122,6 +125,9 @@ class QuantumStateDecoder:
         )
 
         # Blend: (1 - α) * original + α * modified
+        original_activation = original_activation.to(self.device)
+        decoded_activation = decoded_activation.to(self.device)
+
         blended = (1.0 - blend_ratio) * original_activation + blend_ratio * decoded_activation
 
         return blended
@@ -149,6 +155,9 @@ class QuantumStateDecoder:
             Blended and normalized quantum state
         """
         # Linear combination in quantum space
+        original_quantum_state = original_quantum_state.to(self.device)
+        modified_quantum_state = modified_quantum_state.to(self.device)
+
         blended_state = (
             (1.0 - blend_ratio) * original_quantum_state +
             blend_ratio * modified_quantum_state
@@ -161,7 +170,7 @@ class QuantumStateDecoder:
 
     def test_reconstruction_quality(
         self,
-        original_activation: np.ndarray,
+        original_activation: Union[np.ndarray, torch.Tensor],
         quantum_state: torch.Tensor
     ) -> dict:
         """
@@ -176,15 +185,15 @@ class QuantumStateDecoder:
         """
         # Convert original to tensor
         if isinstance(original_activation, np.ndarray):
-            original_tensor = torch.tensor(original_activation, dtype=torch.float32)
+            original_tensor = torch.from_numpy(original_activation).to(self.device, dtype=torch.float32)
         else:
-            original_tensor = original_activation
+            original_tensor = original_activation.to(self.device, dtype=torch.float32)
 
         # Handle shape
         if original_tensor.dim() > 1:
             original_tensor = original_tensor.flatten()[:self.input_dim]
         if original_tensor.shape[0] < self.input_dim:
-            padding = torch.zeros(self.input_dim - original_tensor.shape[0])
+            padding = torch.zeros(self.input_dim - original_tensor.shape[0], device=self.device)
             original_tensor = torch.cat([original_tensor, padding])
 
         # Decode quantum state

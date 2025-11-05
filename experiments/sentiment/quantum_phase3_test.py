@@ -25,7 +25,7 @@ import json
 import torch
 import numpy as np
 
-from src.model_adapter_tl import TransformerLensAdapter
+from src.model_adapter_tl import ModelAdapterFactory
 from src.quantum_encoder import QuantumStateEncoder
 from src.quantum_decoder import QuantumStateDecoder
 from src.unitary_operator import UnitaryOperator
@@ -52,7 +52,7 @@ class QuantumInterventionSystem:
             print(f"  Reserved:  {reserved:.2f} GB")
             print(f"  Free:      {free_gb:.2f} / {total_gb:.2f} GB")
 
-    def __init__(self, config: QuantumConfig):
+    def __init__(self, config: QuantumConfig, *, max_tokens: int = 25, stop_at_eos: bool = True, temperature: float = 0.8, top_k: int = 50, activation_blend: float = 0.0):
         self.config = config
 
         print("\n" + "=" * 70)
@@ -71,6 +71,14 @@ class QuantumInterventionSystem:
 
         self.create_decoder()
 
+        # Generation controls
+        self.gen_max_tokens = max_tokens
+        self.gen_stop_at_eos = stop_at_eos
+        self.gen_temperature = temperature
+        self.gen_top_k = top_k
+        # Final activation-space damping (previously hardcoded to 0.5)
+        self.activation_blend = activation_blend
+
     def load_model(self):
         """Load language model from config"""
         print(f"\n[Loading {self.config.model_name}]")
@@ -84,7 +92,8 @@ class QuantumInterventionSystem:
         else:
             device = self.config.device
 
-        self.adapter = TransformerLensAdapter(self.config.model_name, device)
+        self.adapter = ModelAdapterFactory.create_adapter(self.config.model_name, device)
+        self.device = torch.device(device)
         print(f"✓ {self.config.model_name} loaded on {device}")
 
     def load_encoder(self):
@@ -100,7 +109,10 @@ class QuantumInterventionSystem:
                 f"Encoder projection for {model_id} not found! Run Phase 1 first."
             )
 
-        self.encoder = QuantumStateEncoder.load_from_saved(projection_file)
+        self.encoder = QuantumStateEncoder.load_from_saved(
+            projection_file,
+            device=self.device
+        )
         print("✓ Encoder loaded")
 
     def load_operator_smart(self, file_path: Path, quantum_dim: int, device='cuda'):
@@ -189,15 +201,15 @@ class QuantumInterventionSystem:
         self.decoder = QuantumStateDecoder(self.encoder.projection)
         print("✓ Decoder created")
 
-    def run_baseline(self, prompt: str, max_tokens: int = 25) -> str:
+    def run_baseline(self, prompt: str, max_tokens: int = None) -> str:
         """Run baseline generation without intervention"""
         tokens = self.adapter.model.to_tokens(prompt)
         output = self.adapter.model.generate(
             tokens,
-            max_new_tokens=max_tokens,
-            temperature=0.8,
-            top_k=50,
-            stop_at_eos=True,
+            max_new_tokens=self.gen_max_tokens if max_tokens is None else max_tokens,
+            temperature=self.gen_temperature,
+            top_k=self.gen_top_k,
+            stop_at_eos=self.gen_stop_at_eos,
             verbose=False
         )
 
@@ -211,7 +223,7 @@ class QuantumInterventionSystem:
         prompt: str,
         operator: UnitaryOperator,
         blend_ratio: float = 0.1,
-        max_tokens: int = 25
+        max_tokens: int = None
     ) -> str:
         """
         Run generation with quantum intervention
@@ -235,13 +247,16 @@ class QuantumInterventionSystem:
             """
 
             # Determine operator device
-            operator_device = next(operator.parameters()).device
+            try:
+                operator_device = next(operator.parameters()).device
+            except StopIteration:
+                buffers = list(operator.buffers())
+                operator_device = buffers[0].device if buffers else self.device
 
-            # 1. Encode activation to quantum state (always starts on CPU)
-            quantum_state = self.encoder.encode_activation(activations.cpu().numpy())
+            # 1. Encode activation to quantum state on proper device
+            quantum_state = self.encoder.encode_activation(activations)
 
-            # 2. Move to operator's device if it's on GPU
-            if operator_device.type == 'cuda':
+            if quantum_state.device != operator_device:
                 quantum_state = quantum_state.to(operator_device)
 
             # 3. Apply unitary operator (on whatever device it lives)
@@ -258,28 +273,26 @@ class QuantumInterventionSystem:
             else:
                 blended_state = transformed_state
 
-            # 5. Decode back to activation space (move to CPU for numpy conversion)
+            # 5. Decode back to activation space
             decoded_activation = self.decoder.decode_quantum_state(
-                blended_state.cpu(),
+                blended_state,
                 method="real_component"
-            )
+            ).to(activations.device)
 
             # 6. Reshape to match original activation shape
             original_shape = activations.shape
             if len(original_shape) == 3:
                 batch_size, seq_len, dim = original_shape
-                decoded_activation = decoded_activation.unsqueeze(0).unsqueeze(0)
-                decoded_activation = decoded_activation.expand(batch_size, seq_len, dim)
+                decoded_activation = decoded_activation.view(1, 1, dim).expand(batch_size, seq_len, dim)
 
-            # 7. Final gentle blend in activation space (optional extra control)
-            # This is insurance for coherence preservation
-            gentle_blend = 0.5  # Extra damping
+            # 7. Final gentle blend in activation space (configurable)
+            alpha = self.activation_blend
             final_activation = (
-                (1 - gentle_blend) * activations.cpu() +
-                gentle_blend * decoded_activation
+                (1 - alpha) * activations +
+                alpha * decoded_activation
             )
 
-            return final_activation.to(activations.device)
+            return final_activation
 
         # Run generation with intervention
         hook_name = f"blocks.{self.config.target_layer}.hook_resid_post"
@@ -289,10 +302,10 @@ class QuantumInterventionSystem:
         with self.adapter.model.hooks(fwd_hooks=[(hook_name, quantum_intervention)]):
             output = self.adapter.model.generate(
                 tokens,
-                max_new_tokens=max_tokens,
-                temperature=0.8,
-                top_k=50,
-                stop_at_eos=True,
+                max_new_tokens=self.gen_max_tokens if max_tokens is None else max_tokens,
+                temperature=self.gen_temperature,
+                top_k=self.gen_top_k,
+                stop_at_eos=self.gen_stop_at_eos,
                 verbose=False
             )
 
@@ -385,22 +398,72 @@ class QuantumInterventionSystem:
         print(f"✓ Created symlink: quantum_results_latest.json")
 
 
-def run_phase3(preset: str = 'local'):
+def run_phase3(
+    preset: str = 'local',
+    *,
+    max_tokens: int = 25,
+    stop_at_eos: bool = True,
+    temperature: float = 0.8,
+    top_k: int = 50,
+    activation_blend: float = 0.0,
+    blend_ratios: List[float] = None,
+    num_prompts: int = None,
+    model_name_override: str = None,
+):
     """Run Phase 3 intervention testing"""
 
     config = QuantumConfig.from_preset(preset)
+    if model_name_override:
+        config.model_name = model_name_override
+
+    # Optional override of blend ratios from CLI
+    if blend_ratios is not None and len(blend_ratios) > 0:
+        config.blend_ratios = blend_ratios
 
     # Create intervention system
-    system = QuantumInterventionSystem(config)
+    system = QuantumInterventionSystem(
+        config,
+        max_tokens=max_tokens,
+        stop_at_eos=stop_at_eos,
+        temperature=temperature,
+        top_k=top_k,
+        activation_blend=activation_blend
+    )
 
-    # Define test prompts (neutral)
-    test_prompts = [
-        "The meeting this afternoon will",
-        "I opened the envelope and found",
-        "The restaurant downtown is",
-        "My friend called to say",
-        "The project manager announced that",
-    ]
+    # Define test prompts (neutral) or load a small set from prompts file
+    if num_prompts is not None and num_prompts > 0:
+        prompts_path = ROOT / "prompts" / "diverse_prompts_50.json"
+        if prompts_path.exists():
+            with open(prompts_path, 'r') as f:
+                pdata = json.load(f)
+            pool = pdata.get("positive_prompts", []) + pdata.get("negative_prompts", [])
+            test_prompts = pool[:num_prompts] if pool else []
+            if not test_prompts:
+                # Fallback to default list if file empty
+                test_prompts = [
+                    "The meeting this afternoon will",
+                    "I opened the envelope and found",
+                    "The restaurant downtown is",
+                    "My friend called to say",
+                    "The project manager announced that",
+                ]
+        else:
+            # Fallback to default list if file missing
+            test_prompts = [
+                "The meeting this afternoon will",
+                "I opened the envelope and found",
+                "The restaurant downtown is",
+                "My friend called to say",
+                "The project manager announced that",
+            ]
+    else:
+        test_prompts = [
+            "The meeting this afternoon will",
+            "I opened the envelope and found",
+            "The restaurant downtown is",
+            "My friend called to say",
+            "The project manager announced that",
+        ]
 
     print("\n" + "=" * 70)
     print("TESTING QUANTUM INTERVENTIONS")
@@ -436,11 +499,36 @@ def main():
         choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote'],
         help='Configuration preset'
     )
+    parser.add_argument('--model', type=str, default='', help='Override model name (e.g., pythia-410m, pythia-1.4b, Qwen/Qwen3-8B)')
+    parser.add_argument('--max-tokens', type=int, default=25, help='Max new tokens to generate')
+    parser.add_argument('--stop-at-eos', action='store_true', default=True, help='Stop generation at EOS token')
+    parser.add_argument('--no-stop-at-eos', dest='stop_at_eos', action='store_false')
+    parser.add_argument('--temperature', type=float, default=0.8, help='Sampling temperature')
+    parser.add_argument('--top-k', type=int, default=50, help='Top-k sampling')
+    parser.add_argument('--activation-blend', type=float, default=0.0, help='Final activation-space damping (0.0–1.0)')
+    parser.add_argument('--blend-ratios', type=str, default='', help='Comma-separated list to override blend ratios (e.g., 0.02,0.05,0.1,0.2)')
+    parser.add_argument('--num-prompts', type=int, default=0, help='Load first N prompts from prompts/diverse_prompts_50.json')
 
     args = parser.parse_args()
 
     print(f"\nRunning Phase 3 with preset: {args.preset.upper()}")
-    run_phase3(preset=args.preset)
+    ratios = None
+    if args.blend_ratios:
+        try:
+            ratios = [float(x.strip()) for x in args.blend_ratios.split(',') if x.strip()]
+        except ValueError:
+            ratios = None
+    run_phase3(
+        preset=args.preset,
+        max_tokens=args.max_tokens,
+        stop_at_eos=args.stop_at_eos,
+        temperature=args.temperature,
+        top_k=args.top_k,
+        activation_blend=args.activation_blend,
+        blend_ratios=ratios,
+        num_prompts=args.num_prompts if args.num_prompts and args.num_prompts > 0 else None,
+        model_name_override=args.model if args.model else None,
+    )
 
 
 if __name__ == "__main__":

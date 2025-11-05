@@ -6,7 +6,7 @@ Encodes real-valued neural network activations as normalized complex quantum sta
 
 import torch
 import numpy as np
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 from pathlib import Path
 
 from src.quantum_utils import normalize_state, quantum_fidelity
@@ -25,7 +25,13 @@ class QuantumStateEncoder:
     - Preserves more information (amplitude + phase)
     """
 
-    def __init__(self, input_dim: int = 768, quantum_dim: int = 10000, seed: int = 42):
+    def __init__(
+        self,
+        input_dim: int = 768,
+        quantum_dim: int = 10000,
+        seed: int = 42,
+        device: Optional[torch.device] = None,
+    ):
         """
         Initialize quantum encoder with deterministic random projection
 
@@ -39,6 +45,9 @@ class QuantumStateEncoder:
         self.input_dim = input_dim
         self.quantum_dim = quantum_dim
         self.seed = seed
+        if device is None:
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(device)
 
         print(f"[Quantum State Encoder]")
         print(f"  Real activations: {input_dim}-d")
@@ -49,19 +58,17 @@ class QuantumStateEncoder:
         # Create deterministic complex projection matrix
         torch.manual_seed(seed)
 
-        # Complex projection: separate real and imaginary parts
-        real_part = torch.randn(input_dim, quantum_dim)
-        imag_part = torch.randn(input_dim, quantum_dim)
+        real_part = torch.randn(input_dim, quantum_dim, device=self.device, dtype=torch.float32)
+        imag_part = torch.randn(input_dim, quantum_dim, device=self.device, dtype=torch.float32)
 
-        self.projection = torch.complex(real_part, imag_part)
+        self.projection = torch.complex(real_part, imag_part).to(torch.complex64)
 
-        # Normalize columns (optional, helps with numerical stability)
-        col_norms = torch.sqrt(torch.sum(torch.abs(self.projection) ** 2, dim=0, keepdim=True))
+        col_norms = torch.linalg.norm(self.projection, dim=0, keepdim=True)
         self.projection = self.projection / col_norms
 
         print(f"  ✓ Complex projection matrix created: {self.projection.shape}")
 
-    def encode_activation(self, activation: np.ndarray) -> torch.Tensor:
+    def encode_activation(self, activation: Union[np.ndarray, torch.Tensor]) -> torch.Tensor:
         """
         Encode a single activation to quantum state |ψ⟩
 
@@ -71,8 +78,15 @@ class QuantumStateEncoder:
         Returns:
             Normalized complex quantum state (shape: [quantum_dim])
         """
-        # Convert to tensor
-        act_tensor = torch.tensor(activation, dtype=torch.float32)
+        if isinstance(activation, np.ndarray):
+            act_tensor = torch.from_numpy(activation).to(self.device, dtype=torch.float32)
+        elif isinstance(activation, torch.Tensor):
+            act_tensor = activation.to(self.device, dtype=torch.float32)
+        else:
+            raise TypeError("Activation must be numpy array or torch tensor")
+
+        if act_tensor.requires_grad:
+            act_tensor = act_tensor.detach()
 
         # Handle different input shapes (same as classical HDC)
         if len(act_tensor.shape) == 3:
@@ -89,7 +103,7 @@ class QuantumStateEncoder:
         if act_tensor.shape[0] > self.input_dim:
             act_tensor = act_tensor[:self.input_dim]
         elif act_tensor.shape[0] < self.input_dim:
-            padding = torch.zeros(self.input_dim - act_tensor.shape[0])
+            padding = torch.zeros(self.input_dim - act_tensor.shape[0], device=self.device)
             act_tensor = torch.cat([act_tensor, padding])
 
         # Project to quantum space: ψ = activation @ projection
@@ -121,7 +135,7 @@ class QuantumStateEncoder:
             if (i + 1) % 20 == 0:
                 print(f"    Progress: {i+1}/{len(activations)}")
 
-            quantum_state = self.encode_activation(act)
+            quantum_state = self.encode_activation(act).detach().to('cpu')
             quantum_states.append(quantum_state)
 
         print(f"  ✓ Encoded {len(quantum_states)} quantum states")
@@ -148,8 +162,8 @@ class QuantumStateEncoder:
         print(f"\n  [Quantum Separation Analysis]")
 
         # Convert to tensors for batch operations
-        pos_batch = torch.stack(positive_states)
-        neg_batch = torch.stack(negative_states)
+        pos_batch = torch.stack([state.to(self.device) for state in positive_states])
+        neg_batch = torch.stack([state.to(self.device) for state in negative_states])
 
         # Compute centroids (mean quantum states)
         pos_centroid = normalize_state(pos_batch.mean(dim=0))
@@ -218,7 +232,7 @@ class QuantumStateEncoder:
             f"Projection shape mismatch: {self.projection.shape} vs expected ({self.input_dim}, {self.quantum_dim})"
 
         torch.save({
-            'projection': self.projection,
+            'projection': self.projection.to('cpu'),
             'input_dim': self.input_dim,
             'quantum_dim': self.quantum_dim,
             'seed': self.seed,
@@ -228,7 +242,11 @@ class QuantumStateEncoder:
         print(f"  ✓ Projection matrix saved to {save_path}")
 
     @classmethod
-    def load_from_saved(cls, load_path: Path) -> 'QuantumStateEncoder':
+    def load_from_saved(
+        cls,
+        load_path: Path,
+        device: Optional[torch.device] = None,
+    ) -> 'QuantumStateEncoder':
         """
         Load encoder from saved projection matrix
 
@@ -243,11 +261,12 @@ class QuantumStateEncoder:
         encoder = cls(
             input_dim=checkpoint['input_dim'],
             quantum_dim=checkpoint['quantum_dim'],
-            seed=checkpoint['seed']
+            seed=checkpoint['seed'],
+            device=device
         )
 
         # Override with saved projection
-        encoder.projection = checkpoint['projection']
+        encoder.projection = checkpoint['projection'].to(encoder.device)
 
         # Validate dimensions
         assert encoder.projection.shape == (encoder.input_dim, encoder.quantum_dim), \

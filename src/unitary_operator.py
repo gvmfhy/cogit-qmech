@@ -51,6 +51,9 @@ class UnitaryLayer(nn.Module):
         # We only store the upper triangle to enforce antisymmetry
         self.B_upper = nn.Parameter(torch.randn(dim, dim) * 0.01)
 
+        # Inference-time cache for unitary matrix U to avoid recomputing Cayley per forward
+        self._cached_U = None
+
     def get_hermitian_matrix(self) -> torch.Tensor:
         """
         Construct Hermitian matrix H from parameters
@@ -79,11 +82,16 @@ class UnitaryLayer(nn.Module):
         Returns:
             Transformed state U|ψ⟩
         """
-        # Get Hermitian matrix
-        H = self.get_hermitian_matrix()
-
-        # Convert to unitary via Cayley transform
-        U = cayley_transform(H)
+        # Use cached U during evaluation to avoid repeated Cayley solves
+        if not self.training and self._cached_U is not None:
+            U = self._cached_U
+        else:
+            # Get Hermitian matrix and compute unitary via Cayley transform
+            H = self.get_hermitian_matrix()
+            U = cayley_transform(H)
+            # Cache only in eval mode
+            if not self.training:
+                self._cached_U = U
 
         # Apply to state(s)
         if quantum_state.dim() == 1:
@@ -100,8 +108,19 @@ class UnitaryLayer(nn.Module):
         Returns:
             Unitary matrix U = Cayley(H)
         """
+        if not self.training and self._cached_U is not None:
+            return self._cached_U
         H = self.get_hermitian_matrix()
-        return cayley_transform(H)
+        U = cayley_transform(H)
+        if not self.training:
+            self._cached_U = U
+        return U
+
+    def train(self, mode: bool = True):
+        """Override to invalidate cache when switching to train mode"""
+        super().train(mode)
+        if mode:
+            self._cached_U = None
 
 
 class UnitaryOperator(nn.Module):

@@ -14,6 +14,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from abc import ABC, abstractmethod
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
+from src.model_adapter_hf import HFAdapter
 
 # Set seeds for reproducibility
 random.seed(42)
@@ -235,22 +236,15 @@ class ModelAdapterFactory:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         
         if use_transformer_lens:
-            # Use TransformerLens adapter by default for supported models
-            supported_models = ["gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl", 
-                              "gpt-neo-125M", "gpt-neo-1.3B", "gpt-neo-2.7B",
-                              "gpt-j-6B", "pythia-70m", "pythia-160m", "pythia-410m",
-                              "pythia-1b", "pythia-1.4b", "pythia-2.8b", "pythia-6.9b"]
-            
-            if any(model in model_name for model in supported_models):
+            # Always try TransformerLens first (covers Pythia, GPT, Qwen families, etc.)
+            try:
                 return TransformerLensAdapter(model_name, device)
-            else:
-                print(f"Warning: {model_name} not directly supported by TransformerLens")
-                print("Falling back to manual implementation")
-                # Could fall back to old implementation here
-                raise NotImplementedError(f"Model {model_name} not supported")
+            except Exception:
+                print(f"Falling back to HF adapter for {model_name}")
+                return HFAdapter(model_name, device)
         else:
-            # Use old manual implementation if specified
-            raise NotImplementedError("Manual implementation deprecated - use TransformerLens")
+            # Explicit HF path
+            return HFAdapter(model_name, device)
 
 
 def test_adapter():

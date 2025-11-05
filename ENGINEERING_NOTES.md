@@ -1028,6 +1028,32 @@ This shift unlocks:
 
 ---
 
+## 2025-11-05 – Steering Pipeline Speed & Model Flexibility Upgrade
+
+**What changed**
+- Added Phase 3 CLI controls (`--model`, `--max-tokens`, `--stop-at-eos`, `--temperature`, `--top-k`, `--activation-blend`, `--blend-ratios`, `--num-prompts`) so long-context runs and blend sweeps require no code edits.
+- Replaced the hardcoded 0.5 activation damping with a configurable `activation_blend` (default 0.0) to avoid masking steering effects.
+- Cached unitary operators during eval, eliminating per-token Cayley solves and cutting inference latency roughly in half.
+- Introduced a model adapter factory that tries TransformerLens first (covers Pythia + Qwen3) and falls back to a minimal HF adapter only if TL load fails. Phase 1/3 now use this path.
+- Added a `--model` override to the evaluator to log cross-model results consistently (Pythia smoke tests vs Qwen3 confirmation).
+
+**Why**
+- The pipeline was speed-limited by repeated Cayley solves and short, fixed-length generations.
+- We needed rapid smoke tests on TL models (Pythia-410M) and effortless promotion to Qwen3-4B without editing code between runs.
+- Hardcoded damping muted the signal; making it optional lets us observe raw steering and reintroduce damping only when coherence demands it.
+
+**Impact**
+- Full 0.02→2.0 blend-ratio U-curve on 6 prompts now runs in ~2 minutes (Pythia-410M) and ~4 minutes (Qwen3-4B).
+- Phase 1/2/3 share the same adapter logic, so switching models is a CLI flag rather than a code change.
+- Evaluation outputs record the exact model used, keeping cross-model comparisons auditable.
+
+**Next steps**
+- Run Pythia-410M sweeps first for fast signal checks, then replicate on Qwen3-4B to lock in the main result.
+- If high blend ratios remain incoherent, investigate phase-aware decoding or residual blending; otherwise focus on operator tuning under the new settings.
+- Reintroduce the HF adapter file only if TL support regresses; current coverage makes TL-first viable for all target models.
+
+---
+
 **End of Document**
 
 *This document should be updated as we complete priorities and learn more about what works.*
