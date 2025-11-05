@@ -1,0 +1,41 @@
+{
+  "description": "Comprehensive validation of improved neutral-stem prompts across models and configurations",
+  "experiments": [
+    {
+      "name": "qwen3b_improved_baseline",
+      "preset": "qwen_local",
+      "prompts": "prompts/improved_prompts_100.json",
+      "neutral_prompts": "prompts/neutral_prompts_40.json",
+      "blend_ratio": 0.5,
+      "num_prompts": 100,
+      "max_tokens": 40
+    },
+    {
+      "name": "qwen3b_improved_blend_sweep",
+      "preset": "qwen_local",
+      "prompts": "prompts/improved_prompts_100.json",
+      "neutral_prompts": "prompts/neutral_prompts_40.json",
+      "blend_ratios": [0.05, 0.1, 0.5, 1.0],
+      "num_prompts": 100,
+      "max_tokens": 40
+    },
+    {
+      "name": "pythia410m_improved_baseline",
+      "preset": "pythia_410m",
+      "prompts": "prompts/improved_prompts_100.json",
+      "neutral_prompts": "prompts/neutral_prompts_40.json",
+      "blend_ratio": 0.5,
+      "num_prompts": 100,
+      "max_tokens": 40
+    },
+    {
+      "name": "qwen3b_decode_method_comparison",
+      "preset": "qwen_local",
+      "prompts": "prompts/improved_prompts_100.json",
+      "decode_methods": ["real_component", "real_imag_avg"],
+      "blend_ratio": 0.5,
+      "num_prompts": 50,
+      "max_tokens": 40
+    }
+  ]
+}
