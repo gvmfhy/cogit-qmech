@@ -336,3 +336,103 @@ Example:
 ```
 
 **Document in EXPERIMENT_LOG.md after each run.**
+
+---
+
+## GPU Memory Constraints: Phase 3 with Large Models
+
+**Date**: 2025-11-04
+**Issue**: Phase 3 crashes with "CUDA out of memory" when testing interventions on Qwen 7B
+
+### Root Cause Analysis
+
+**Memory requirements:**
+```
+Qwen 7B model:        ~30 GB  (loaded on GPU for inference)
+Operator U_pos→neg:   ~1.4 GB (174M params × 2 complex × 4 bytes)
+Operator U_neg→pos:   ~1.4 GB
+----------------------------------------
+Total needed:         ~32.8 GB
+GPU available:        32 GB (RTX 5090)
+```
+
+**Why Phase 2 worked but Phase 3 failed:**
+- Phase 2: Only operators on GPU, no language model → fits easily
+- Phase 3: Model + operators simultaneously → doesn't fit
+
+### The Mistake
+
+Initially tried to "fix" GPU utilization by moving operators to GPU:
+```python
+# experiments/sentiment/quantum_phase3_test.py:103, 119
+self.operator_pos_to_neg.to(device)  # WRONG - causes OOM
+```
+
+This failed with:
+```
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 334.00 MiB.
+GPU 0 has a total capacity of 31.37 GiB of which 188.69 MiB is free.
+```
+
+### The Solution
+
+**Keep operators on CPU, move only small tensors during inference:**
+
+```python
+# Load operators to CPU
+checkpoint = torch.load(file, map_location='cpu')  # Not 'cuda'
+operator = UnitaryOperator(quantum_dim)
+operator.load_state_dict(checkpoint)
+# Do NOT call .to(device)
+
+# In intervention function:
+quantum_state = encoder.encode_activation(activations.cpu().numpy())
+# Keep on CPU - operator is on CPU
+transformed_state = operator(quantum_state)  # Runs on CPU
+# Move final result back to GPU
+final_activation.to(activations.device)
+```
+
+**Tradeoff:**
+- ❌ Slower inference (CPU matmul for 174M param operators)
+- ✅ Works within memory constraints
+- ✅ GPU still used for model forward pass (the expensive part)
+
+### Lessons Learned
+
+1. **Always calculate memory requirements upfront:**
+   - Model size
+   - Operator sizes (params × dtype size)
+   - Intermediate tensors
+   - Total vs available GPU memory
+
+2. **Phase 2 vs Phase 3 have different memory profiles:**
+   - Don't assume what works in training will work in inference
+
+3. **CPU/GPU hybrid execution is valid:**
+   - Keep heavy static weights where they fit
+   - Move only dynamic data between devices
+   - Profile to find bottlenecks
+
+4. **Document constraints in config.py:**
+   ```python
+   @classmethod
+   def qwen_remote(cls):
+       # Note: 7B model + operators requires hybrid CPU/GPU execution
+       # Operators kept on CPU due to 32GB GPU memory limit
+       return cls(device='cuda', ...)  # device applies to model only
+   ```
+
+### Future Solutions
+
+**For 70B model on A100 80GB:**
+- 70B model: ~140 GB (won't fit even without operators)
+- Will need model quantization (int8/int4) or offloading strategies
+- Document memory requirements before attempting
+
+**GPU memory monitoring:**
+```python
+import torch
+print(f"GPU memory allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+print(f"GPU memory reserved: {torch.cuda.memory_reserved() / 1e9:.2f} GB")
+```
