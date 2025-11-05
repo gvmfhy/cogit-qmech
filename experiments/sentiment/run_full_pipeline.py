@@ -59,6 +59,24 @@ class PipelineRunner:
             print(f"\n[Data Check] No existing Phase 1 data found")
             return False
 
+        # Check quantum dimension compatibility
+        try:
+            with open(quantum_states_file, 'r') as f:
+                data = json.load(f)
+                if 'positive_quantum_states' in data and len(data['positive_quantum_states']) > 0:
+                    # Get dimension from first state (real + imag components)
+                    existing_dim = len(data['positive_quantum_states'][0]['real'])
+                    config_dim = self.config.quantum_dim
+
+                    if existing_dim != config_dim:
+                        print(f"\n❌ [Dimension Mismatch] Existing data has {existing_dim}-d, config specifies {config_dim}-d")
+                        print(f"  Cannot reuse existing data - dimension mismatch would cause operator loading failures")
+                        print(f"  Phase 1 will be re-run with {config_dim}-d quantum states")
+                        return False
+        except Exception as e:
+            print(f"\n⚠️  [Warning] Could not verify dimension compatibility: {e}")
+            print(f"  Proceeding with caution...")
+
         # Check age
         file_age = time.time() - quantum_states_file.stat().st_mtime
         age_minutes = file_age / 60
