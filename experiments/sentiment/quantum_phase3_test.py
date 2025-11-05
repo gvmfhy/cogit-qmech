@@ -12,7 +12,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 import argparse
 
 os.environ['PYTHONHASHSEED'] = '42'
@@ -52,7 +52,7 @@ class QuantumInterventionSystem:
             print(f"  Reserved:  {reserved:.2f} GB")
             print(f"  Free:      {free_gb:.2f} / {total_gb:.2f} GB")
 
-    def __init__(self, config: QuantumConfig, *, max_tokens: int = 25, stop_at_eos: bool = True, temperature: float = 0.8, top_k: int = 50, activation_blend: float = 0.0):
+    def __init__(self, config: QuantumConfig, *, max_tokens: int = 25, stop_at_eos: bool = True, temperature: float = 0.8, top_k: int = 50, activation_blend: float = 0.0, decode_method: str = "real_component"):
         self.config = config
 
         print("\n" + "=" * 70)
@@ -78,6 +78,10 @@ class QuantumInterventionSystem:
         self.gen_top_k = top_k
         # Final activation-space damping (previously hardcoded to 0.5)
         self.activation_blend = activation_blend
+        # Quantum decoding method
+        self.decode_method = decode_method
+
+        print(f"\n[Decode Method]: {self.decode_method}")
 
     def load_model(self):
         """Load language model from config"""
@@ -276,7 +280,7 @@ class QuantumInterventionSystem:
             # 5. Decode back to activation space
             decoded_activation = self.decoder.decode_quantum_state(
                 blended_state,
-                method="real_component"
+                method=self.decode_method
             ).to(activations.device)
 
             # 6. Reshape to match original activation shape
@@ -409,6 +413,8 @@ def run_phase3(
     blend_ratios: List[float] = None,
     num_prompts: int = None,
     model_name_override: str = None,
+    prompts_path: Optional[str] = None,
+    decode_method: str = "real_component",
 ):
     """Run Phase 3 intervention testing"""
 
@@ -427,19 +433,19 @@ def run_phase3(
         stop_at_eos=stop_at_eos,
         temperature=temperature,
         top_k=top_k,
-        activation_blend=activation_blend
+        activation_blend=activation_blend,
+        decode_method=decode_method
     )
 
-    # Define test prompts (neutral) or load a small set from prompts file
+    # Define test prompts (load from file if provided/available)
     if num_prompts is not None and num_prompts > 0:
-        prompts_path = ROOT / "prompts" / "diverse_prompts_50.json"
-        if prompts_path.exists():
-            with open(prompts_path, 'r') as f:
+        p_path = Path(prompts_path) if prompts_path else (ROOT / "prompts" / "diverse_prompts_50.json")
+        if p_path.exists():
+            with open(p_path, 'r') as f:
                 pdata = json.load(f)
             pool = pdata.get("positive_prompts", []) + pdata.get("negative_prompts", [])
             test_prompts = pool[:num_prompts] if pool else []
             if not test_prompts:
-                # Fallback to default list if file empty
                 test_prompts = [
                     "The meeting this afternoon will",
                     "I opened the envelope and found",
@@ -448,7 +454,6 @@ def run_phase3(
                     "The project manager announced that",
                 ]
         else:
-            # Fallback to default list if file missing
             test_prompts = [
                 "The meeting this afternoon will",
                 "I opened the envelope and found",
@@ -507,7 +512,11 @@ def main():
     parser.add_argument('--top-k', type=int, default=50, help='Top-k sampling')
     parser.add_argument('--activation-blend', type=float, default=0.0, help='Final activation-space damping (0.0–1.0)')
     parser.add_argument('--blend-ratios', type=str, default='', help='Comma-separated list to override blend ratios (e.g., 0.02,0.05,0.1,0.2)')
-    parser.add_argument('--num-prompts', type=int, default=0, help='Load first N prompts from prompts/diverse_prompts_50.json')
+    parser.add_argument('--num-prompts', type=int, default=0, help='Load first N prompts from prompts file')
+    parser.add_argument('--prompts', type=str, default='', help='Path to prompts JSON (expects positive_prompts and negative_prompts)')
+    parser.add_argument('--decode-method', type=str, default='real_component',
+                       choices=['real_component', 'real_imag_avg', 'absolute', 'magnitude'],
+                       help='Quantum decoding method: real_component (baseline), real_imag_avg (uses real+imag), absolute/magnitude (magnitude only)')
 
     args = parser.parse_args()
 
@@ -528,6 +537,8 @@ def main():
         blend_ratios=ratios,
         num_prompts=args.num_prompts if args.num_prompts and args.num_prompts > 0 else None,
         model_name_override=args.model if args.model else None,
+        prompts_path=args.prompts if args.prompts else None,
+        decode_method=args.decode_method,
     )
 
 

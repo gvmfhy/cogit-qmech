@@ -18,7 +18,7 @@ import argparse
 import json
 from dataclasses import asdict
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import numpy as np
 import torch
@@ -45,24 +45,24 @@ class DiagonalUnitaryOperator(torch.nn.Module):
         return state * self.diag
 
 
-def load_prompts(num_prompts: int) -> List[str]:
-    """Load prompts from canonical prompt file, repeating as needed."""
+def load_prompts(num_prompts: int, prompt_path: Optional[Path] = None) -> List[str]:
+    """Load positive+negative prompts from a file, repeating as needed."""
 
-    if not PROMPT_FILE.exists():
+    prompt_path = prompt_path or PROMPT_FILE
+    if not prompt_path.exists():
         raise FileNotFoundError(
-            "Prompt file not found. Ensure Phase 1 has generated prompts or "
-            "create prompts/diverse_prompts_50.json."
+            f"Prompt file not found at {prompt_path}. Provide --prompts or create prompts/diverse_prompts_50.json."
         )
 
-    with open(PROMPT_FILE, "r", encoding="utf-8") as f:
+    with open(prompt_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    positives = data["positive_prompts"]
-    negatives = data["negative_prompts"]
+    positives = data.get("positive_prompts", [])
+    negatives = data.get("negative_prompts", [])
 
     pool = positives + negatives
     if not pool:
-        raise ValueError("No prompts available in prompt file.")
+        raise ValueError("No prompts available in prompt file (expected keys: positive_prompts, negative_prompts).")
 
     if num_prompts <= len(pool):
         return pool[:num_prompts]
@@ -71,6 +71,21 @@ def load_prompts(num_prompts: int) -> List[str]:
     repeats = (num_prompts + len(pool) - 1) // len(pool)
     expanded = (pool * repeats)[:num_prompts]
     return expanded
+
+
+def load_neutral_prompts(prompt_path: Path) -> List[str]:
+    """Load neutral prompts from a file (expects key: neutral_prompts)."""
+
+    if not prompt_path.exists():
+        raise FileNotFoundError(f"Neutral prompt file not found at {prompt_path}.")
+
+    with open(prompt_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    neutrals = data.get("neutral_prompts", [])
+    if not neutrals:
+        raise ValueError("No neutral_prompts found in file.")
+    return neutrals
 
 
 def compute_perplexity(system: QuantumInterventionSystem, prompt: str, completion: str) -> float:
@@ -244,16 +259,25 @@ def main():
     parser.add_argument("--max-tokens", type=int, default=40, help="Max new tokens to generate")
     parser.add_argument("--random-seed", type=int, default=1234, help="Seed for random unitary controls")
     parser.add_argument("--model", type=str, default="", help="Override model name (e.g., pythia-410m, pythia-1.4b, Qwen/Qwen3-8B)")
+    parser.add_argument("--decode-method", type=str, default="real_component", 
+                       choices=["real_component", "real_imag_avg", "absolute", "magnitude"],
+                       help="Decoding method: real_component (baseline), real_imag_avg (uses both real+imag), absolute (magnitude only)")
+    parser.add_argument("--prompts", type=str, default="", help="Path to main prompts JSON (with positive_prompts and negative_prompts)")
+    parser.add_argument("--neutral-prompts", type=str, default="", help="Optional path to neutral prompts JSON (with neutral_prompts)")
 
     args = parser.parse_args()
 
     config = QuantumConfig.from_preset(args.preset)
     if args.model:
         config.model_name = args.model
-    system = QuantumInterventionSystem(config)
+
+    # Pass decode_method to system
+    system = QuantumInterventionSystem(config, decode_method=args.decode_method)
 
     sentiment = sentiment_pipeline(system.device)
-    prompts = load_prompts(args.num_prompts)
+
+    prompt_path = Path(args.prompts) if args.prompts else PROMPT_FILE
+    prompts = load_prompts(args.num_prompts, prompt_path)
 
     dim = system.operator_pos_to_neg.quantum_dim
     random_neg_op = DiagonalUnitaryOperator(dim, system.device, seed=args.random_seed)
@@ -275,6 +299,24 @@ def main():
 
     summary = aggregate(records)
 
+    # Optional: evaluate neutral prompts for drift/specificity checks
+    neutral_records: List[Dict] = []
+    neutral_summary: Optional[Dict] = None
+    if args.neutral_prompts:
+        neutral_path = Path(args.neutral_prompts)
+        neutral_list = load_neutral_prompts(neutral_path)
+        for idx, prompt in enumerate(neutral_list, start=1):
+            result = evaluate_prompt(
+                system,
+                sentiment,
+                prompt,
+                blend_ratio=args.blend_ratio,
+                max_tokens=args.max_tokens,
+                random_ops=(random_neg_op, random_pos_op),
+            )
+            neutral_records.append({"prompt": prompt, **result})
+        neutral_summary = aggregate(neutral_records)
+
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = RESULTS_DIR / f"evaluation_{args.preset}_{int(args.blend_ratio*100):02d}_{timestamp}.json"
@@ -291,6 +333,10 @@ def main():
         "summary": summary,
         "records": records,
     }
+
+    if neutral_summary is not None:
+        payload["neutral_summary"] = neutral_summary
+        payload["neutral_records"] = neutral_records
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
