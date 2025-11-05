@@ -664,5 +664,222 @@ python experiments/sentiment/run_full_pipeline.py --preset qwen_remote
 
 ---
 
-**Last Updated:** 2025-11-04 01:30 UTC
-**Decisions Logged:** 3
+## Decision #004: H200 Deployment & Device Auto-Detection Fix
+
+**Date:** 2025-11-05
+**Time:** ~01:00 UTC
+**Context:** Deploying refactored code to RunPod H200 SXM (143GB VRAM) for full-scale Qwen2.5-7B testing
+
+### The Problem
+
+After completing Decision #003 refactoring, attempted to deploy and run `qwen_tiny` experiment on H200. **Critical bug discovered:** Models were loading on CPU despite 141GB of available GPU memory.
+
+**User observation (paraphrased):**
+> "Let's pause. Why are models being loaded on cpu not gpu?"
+> "I do worry that fall back to cpu is a red flag"
+> "It is also a sign that you were mistaken on your refactor"
+
+**Output showing bug:**
+```
+Device:               cpu
+✓ Model loaded on cpu
+```
+
+### Root Cause Analysis
+
+**What went wrong:**
+1. Decision #003 refactored phase scripts to respect `config.device`
+2. Added device auto-detection logic in phase scripts (lines 55-66)
+3. **BUT:** Forgot to update config preset definitions in `config.py`
+4. All 7 presets still hardcoded `device='cpu'` or `device='cuda'`
+
+**Why this broke auto-detection:**
+```python
+# config.py line 210 (qwen_tiny preset)
+device='cpu'  # ❌ HARDCODED - bypasses auto-detection!
+
+# Phase script (quantum_phase1_collect.py lines 55-66)
+if config.device == 'auto':
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+else:
+    device = config.device  # ❌ Uses 'cpu' from preset
+```
+
+The auto-detection logic was present but never executed because presets specified explicit devices.
+
+### Options Considered
+
+#### A) Keep current behavior, document as "feature"
+- ✅ No code changes needed
+- ✅ Allows users to force CPU for debugging
+- ❌ Silent failures (user doesn't know GPU was available)
+- ❌ Violates principle of least surprise
+- ❌ Makes expensive GPU hardware useless by default
+- ❌ User explicitly worried this was a "red flag"
+
+#### B) Change presets to use device='auto'
+- ✅ Works everywhere (Mac, RTX 5090, H100, H200)
+- ✅ Automatically uses GPU when available
+- ✅ Still falls back to CPU gracefully
+- ✅ Users can override via CLI args if needed
+- ✅ Matches user expectation
+- ❌ Need to update 7 preset methods
+
+#### C) Remove device parameter entirely, always auto-detect
+- ✅ Simplest user experience
+- ❌ Removes explicit device control
+- ❌ Makes debugging harder (can't force CPU)
+- ❌ Breaks backward compatibility
+
+---
+
+### Decision Made
+
+**Option B: Change all config presets to device='auto'**
+
+### Reasoning
+
+1. **User expectation:** When paying $1.50/hr for H200, expect GPU usage by default
+2. **Fail-safe design:** Auto-detection + logging makes failures visible
+3. **Portability:** Same preset works on Mac (CPU), RTX 5090 (32GB), H200 (143GB)
+4. **Override-able:** Users can still force device via `config.device = 'cpu'` if needed
+5. **Learning from failure:** User was right to be concerned - this WAS a bug
+
+### Implementation
+
+**Files modified:**
+- `config.py` lines 132, 148, 168, 190, 210, 231, 254
+
+**Changes:**
+```python
+# Before (ALL 7 presets):
+device='cpu'      # or device='cuda'
+
+# After (ALL 7 presets):
+device='auto'     # Auto-detect GPU, fallback to CPU
+```
+
+**Presets updated:**
+1. `local()` - line 132
+2. `remote()` - line 148
+3. `tiny()` - line 168
+4. `qwen_local()` - line 190
+5. `qwen_tiny()` - line 210 (the one that revealed the bug)
+6. `qwen_test_layers()` - line 231
+7. `qwen_remote()` - line 254
+
+### Validation Results
+
+**Test 1: qwen_tiny on H200 (after fix)**
+```
+Device:               auto
+✓ Model loaded on cuda
+
+[GPU Memory After model load]
+  Allocated: 11.48 GB
+  Reserved:  11.56 GB
+  Free:      137.42 / 150.02 GB
+
+Loading U_pos→neg (1,500-d):
+  → Operator loaded to GPU (0.02 GB)
+✓ Loaded U_pos→neg on cuda
+```
+
+**Test 2: qwen_remote (full 7B) on H200**
+```
+Device:               auto
+✓ Model loaded on cuda
+
+[GPU Memory After model load]
+  Allocated: 30.79 GB
+  Reserved:  30.85 GB
+  Free:      118.62 / 150.02 GB
+
+Loading U_pos→neg (9,333-d):
+  → Operator loaded to GPU (0.70 GB)
+✓ Loaded U_pos→neg on cuda
+
+Loading U_neg→pos (9,333-d):
+  → Operator loaded to GPU (0.70 GB)
+✓ Loaded U_neg→pos on cuda
+```
+
+**Phase timings (H200, qwen_remote):**
+- Phase 1: ~90 seconds (model load + data collection)
+- Phase 2: ~402 seconds (training 2 operators, 100 epochs each)
+- Phase 3: ~240 seconds (intervention testing, 6 prompts × 9 conditions)
+
+**Total GPU memory:** 32.22 GB / 150 GB (21.5% utilization, excellent headroom)
+
+### Intervention Quality Check
+
+**Sample results show clear sentiment shifts:**
+
+Prompt: "The project manager announced that"
+- **Baseline**: "the project is 35% complete and will be finished within budget"
+- **U_pos→neg (0.02)**: "the project team will be terminated at the end of the month" ✓ Negative shift!
+- **U_neg→pos (0.05)**: "the project is moving into the next phase and will have a kick-off meeting" ✓ Positive shift!
+
+**Technical validation:**
+- ✅ Both operators maintain unitarity (deviation <0.00003)
+- ✅ Reversibility: ~0.986 (excellent)
+- ✅ Final fidelities: 0.983 (pos→neg), 0.997 (neg→pos)
+- ✅ All operators on GPU (not CPU fallback)
+
+### What We Learned
+
+**About refactoring:**
+1. **Check the whole call chain** - Refactored phase scripts but forgot config presets
+2. **User testing is critical** - User caught the bug immediately by observing output
+3. **Silent failures are dangerous** - CPU fallback without warning would waste expensive GPU time
+4. **Document assumptions** - Should have verified all presets during Decision #003
+
+**About device handling:**
+1. **Auto-detection is robust** - Works across Mac, RTX 5090, H200 without changes
+2. **Logging is essential** - `log_gpu_memory()` made validation trivial
+3. **Progressive testing works** - qwen_tiny caught the bug before expensive qwen_remote run
+4. **User intuition matters** - "I do worry that fall back to cpu is a red flag" was correct
+
+### Technical Debt Resolved
+
+**From TODO_REFACTORING.md:**
+- ✅ Device-aware operator loading (validated on H200)
+- ✅ Device-aware intervention function (working on GPU)
+- ✅ GPU memory profiling (32GB tracked correctly)
+- ✅ **Config preset device handling** (NEW - not in original TODO)
+
+**From Decision #003:**
+- ✅ Test on actual H100/H200 to validate GPU operator loading
+- ✅ Operators load to GPU successfully (0.70 GB each)
+- ✅ No silent CPU fallback
+
+### Future Implications
+
+**For experiments:**
+- Same config preset now works on any hardware (local Mac, cloud GPU)
+- No manual device specification needed
+- GPU utilization is visible and verifiable
+
+**For collaboration:**
+- New users don't need to understand device handling
+- Code "just works" on different hardware
+- Logging makes debugging trivial
+
+**For paper:**
+- Can claim framework is hardware-agnostic
+- Validated on 143GB GPU (scales to future models)
+- Progressive testing strategy is documented
+
+### Validation Criteria
+
+**How we'll know this was the right decision:**
+1. ✅ **qwen_tiny loads to GPU on H200** (validated)
+2. ✅ **qwen_remote completes all 3 phases on GPU** (validated)
+3. ✅ **Operators load to GPU, not CPU** (validated: 0.70GB each on CUDA)
+4. ✅ **Interventions produce sentiment shifts** (validated: clear positive/negative changes)
+5. ✅ **Total cost < $2** (actual: ~$0.25 for 10 min @ $1.50/hr)
+
+---
+
+**Last Updated:** 2025-11-05 01:35 UTC
+**Decisions Logged:** 4

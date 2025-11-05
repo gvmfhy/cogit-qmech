@@ -257,21 +257,29 @@ python experiments/sentiment/test_reversibility.py --preset qwen_remote
 
 ## Refactoring Checklist
 
-**Before H100 migration:**
-- [ ] Implement `load_operator_smart()` with memory checking
-- [ ] Update `quantum_intervention()` for device-aware execution
-- [ ] Add GPU memory profiling to Phase 3 __init__
-- [ ] Add `log_gpu_memory()` calls throughout
-- [ ] Test on Mac (CPU fallback)
-- [ ] Document changes in DECISIONS.md
+**Before H200 migration:**
+- [x] Implement `load_operator_smart()` with memory checking ✅ Decision #003
+- [x] Update `quantum_intervention()` for device-aware execution ✅ Decision #003
+- [x] Add GPU memory profiling to Phase 3 __init__ ✅ Decision #003
+- [x] Add `log_gpu_memory()` calls throughout ✅ Decision #003
+- [x] Test on Mac (CPU fallback) ✅ Decision #003
+- [x] Document changes in DECISIONS.md ✅ Decision #003, #004
 
-**After H100 migration:**
-- [ ] Validate operators load to GPU
-- [ ] Measure Phase 3 speedup (should be ~10×)
-- [ ] Add quantization support for Q8
-- [ ] Create automated setup script
+**After H200 deployment:**
+- [x] Validate operators load to GPU ✅ qwen_remote: 0.70 GB each on CUDA
+- [x] Measure Phase 3 speedup (should be ~10×) ✅ ~3 min on H200 vs projected 2hrs CPU
+- [x] Fix device auto-detection bug ✅ Decision #004 (all presets now use device='auto')
+- [ ] Add quantization support for Q8 (future work)
+- [ ] Create automated setup script (future work)
+
+**Validation Results (H200 SXM, 143GB VRAM):**
+- qwen_tiny (1500-d): ✅ All phases complete, operators on GPU (0.02 GB each)
+- qwen_remote (9333-d): ✅ All phases complete, operators on GPU (0.70 GB each)
+- GPU memory usage: 32.22 GB / 150 GB (21.5% utilization)
+- Intervention quality: ✅ Clear sentiment shifts observed
+- Reversibility: ✅ 0.986 fidelity (excellent)
 
 ---
 
-**Last Updated:** 2025-11-04
-**Status:** CRITICAL refactoring needed before H100 deployment
+**Last Updated:** 2025-11-05 01:35 UTC
+**Status:** ✅ COMPLETE - All critical refactoring validated on H200
