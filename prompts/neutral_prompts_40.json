@@ -1,0 +1,61 @@
+{
+  "neutral_prompts": [
+    "I took the bus to work today instead of driving because the route is straightforward. The commute took about the same amount of time as usual and the bus was moderately full. I spent most of the ride reading emails and planning the first tasks for the morning.",
+    "I organized the folders on my desktop into project-based directories. It took around thirty minutes to move everything into a more logical structure. Now I can find the files I need without searching through a long list of icons.",
+    "The grocery list this week included basics like rice, eggs, vegetables, and coffee. I went early in the morning to avoid crowds and was able to get everything on the list. The total cost was similar to what I typically spend.",
+    "I updated my phone's operating system after receiving a notification. The download finished in about twenty minutes and the device restarted without issues. The home screen layout looks the same and the apps opened normally afterward.",
+    "I set up a new calendar for the next quarter with recurring meetings. The process involved adding standard events and blocking time for focused work. The schedule now reflects the expected weekly rhythm.",
+    "My printer ran low on ink and I replaced the cartridge following the manual. The alignment page printed correctly and the status indicator shows full capacity. Documents are printing with the usual clarity.",
+    "I compared two spreadsheet versions to confirm recent changes. The differences were limited to a handful of cells in the totals row. I noted the edits and saved the consolidated file to the shared drive.",
+    "I cleaned the kitchen counters and loaded the dishwasher after dinner. The cycle ran for its standard duration and finished without any error messages. Dishes are back in the cabinets and surfaces are clear.",
+    "I reviewed the meeting notes from last week and highlighted action items. Each task now has an owner and a target date assigned. The updated list is posted in the project tracker for visibility.",
+    "I scanned a few paper documents into PDFs using the office machine. The files saved to the default network folder with timestamps. I renamed them for consistency and sent them to the appropriate recipients.",
+    "I adjusted the monitor height and seat position at my desk. The keyboard and mouse are now aligned to reduce wrist strain. I'll check in a few days if further changes are needed.",
+    "I created a template for status updates that includes goals, progress, and blockers. The format fits on a single page and uses clear headings. The team will start using it at the next weekly check-in.",
+    "I set up a new user account on the laptop for a contractor. The permissions are limited to the required folders and applications. The login worked on the first try and the default settings loaded.",
+    "I checked the household budget against this month's expenses. The totals for utilities and groceries are close to projections. I recorded the numbers in the budgeting app and archived the receipts.",
+    "I replaced two light bulbs in the hallway that had reached the end of their lifespan. The new bulbs are the same brightness and color temperature as the old ones. The fixtures are functioning normally again.",
+    "I verified the backup completed overnight by checking the logs. The report lists all files as successfully copied with no errors. The next scheduled backup remains set for tomorrow at the same time.",
+    "I measured the space in the living room to see if a bookshelf would fit. The wall length and ceiling height provide ample room. I saved the measurements to reference when comparing models online.",
+    "I emptied the email spam folder after skim-checking the sender names. There were no legitimate messages caught by the filter this time. The inbox is now focused on current threads only.",
+    "I updated a small script to change an output file name convention. The new names include the date in YYYY-MM-DD format. Test runs produced the expected results and files sort correctly.",
+    "I labeled storage containers in the closet with clear stickers. Seasonal items, tools, and documents each have their own bins. It's easier to locate things without opening multiple boxes.",
+    "I paused notifications on my phone for an hour while finishing a task. The focus mode prevented banner alerts and sounds. I turned notifications back on after the work segment was done.",
+    "I checked the weather forecast for the next three days. Temperatures are expected to be within the normal range for this time of year. I set out appropriate clothing and planned to bring an umbrella just in case.",
+    "I calibrated the kitchen scale using a standard weight. The readings now match the reference within a small margin. I'll recalibrate again next month per the manual.",
+    "I consolidated two contact lists that had overlapping entries. Duplicate names were merged and phone numbers verified. The final list is stored in a single address book.",
+    "I reset a smart plug that wasn't responding to the app. After pairing it again, the device appears online. The timer schedule for evening hours is active.",
+    "I refilled the bird feeder in the backyard with the usual seed mix. The level should last about a week based on prior use. I'll check the tray again over the weekend.",
+    "I ran a quick disk cleanup to remove temporary files. Storage usage decreased slightly and the system reports more free space. Applications opened at their regular speed afterward.",
+    "I defrosted the freezer by unplugging it and leaving the door open. Towels absorbed the water and the interior dried fully. I turned it back on and restocked the shelves.",
+    "I sorted mail into categories for bills, personal letters, and advertisements. Important items were placed in a folder on the desk. The rest was recycled in the paper bin.",
+    "I checked the tire pressure on the car at a nearby station. Each tire was adjusted to the recommended PSI listed on the door frame. The monitoring light on the dashboard turned off.",
+    "I scheduled an automatic payment for a monthly subscription. The due date aligns with the typical billing cycle. A confirmation email arrived with the transaction details.",
+    "I replaced the air filter in the HVAC unit following the filter's arrow direction. The old filter showed normal accumulation for the period. I wrote the replacement date on the frame for tracking.",
+    "I updated the Wi‑Fi password on a tablet to match the new router settings. The device reconnected and webpages loaded as expected. Other household devices were unaffected.",
+    "I exported photos from my phone to an external drive. The transfer completed and the file count matched the selection. I verified a few images opened correctly.",
+    "I watered the houseplants with measured amounts according to their care tags. The soil moisture levels are consistent with prior routines. I'll check again mid‑week before the next watering.",
+    "I reviewed a set of instructions for assembling a small shelf. The parts list matched the items in the box. I set aside time this weekend to complete the assembly.",
+    "I paused a streaming subscription at the end of the current billing period. The account shows the next charge date as inactive. I left a reminder to resume it later if needed.",
+    "I checked the smoke detector by pressing the test button. The alarm sounded for a few seconds and then stopped. The battery indicator remains green.",
+    "I aligned the rug in the living room so it sits parallel to the sofa. The edges no longer curl under the table legs. The walkway is clear and centered.",
+    "I printed a single-page form and signed it with a pen. The scan uploaded to the requested portal without issues. The confirmation page shows it was received."
+  ],
+  "metadata": {
+    "version": "1.0",
+    "count": 40,
+    "design_principles": [
+      "3-sentence structure with concrete, procedural content",
+      "Avoid explicit evaluative sentiment words (positive or negative)",
+      "Realistic, everyday tasks with neutral affect",
+      "Specific details without emotional framing",
+      "Target length ~40-60 tokens per prompt"
+    ],
+    "intended_use": [
+      "Baseline skew estimation (positive rate on neutral)",
+      "Classifier noise/variance estimation",
+      "Perplexity and length controls",
+      "Sanity check: steering should not move neutral strongly without intent"
+    ]
+  }
+}
