@@ -177,6 +177,7 @@ class QuantumConfig:
         Quantum: 5333-d (proportional to GPT-2 ratio)
         Memory estimate: ~3.8GB peak
         Training time: ~15-25 min on M1
+        Layer 31 selected via layer sweep (11.10% separation gap - EXCELLENT!)
         """
         return cls(
             model_name="Qwen/Qwen2.5-3B-Instruct",
@@ -186,7 +187,7 @@ class QuantumConfig:
             epochs=100,
             batch_size=10,
             num_prompts=50,
-            target_layer=18,  # ~50% depth for richer semantics
+            target_layer=31,  # 86% depth - best separation from layer sweep
             device='auto'  # Auto-detect GPU, fallback to CPU
         )
 
@@ -325,7 +326,28 @@ class QuantumConfig:
         )
 
     @classmethod
-    def from_preset(cls, preset: Literal['local', 'remote', 'tiny', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'pythia_test_layers', 'qwen3_4b']) -> 'QuantumConfig':
+    def qwen3_4b_test_layers(cls) -> 'QuantumConfig':
+        """
+        Preset for testing multiple layers with Qwen3-4B
+
+        Tests layers at different depths to find optimal layer for sentiment separation
+        Memory estimate: ~10GB
+        """
+        return cls(
+            model_name="Qwen/Qwen3-4B",
+            input_dim=2560,
+            quantum_dim=2000,  # Smaller for speed
+            learning_rate=0.001,
+            epochs=50,
+            batch_size=5,
+            num_prompts=20,
+            target_layer=31,  # Default if test_layers not specified (86% depth - based on Qwen2.5-3B)
+            test_layers=[25, 27, 29, 31, 33, 35],  # Test at 69%, 75%, 81%, 86%, 92%, 97% depth (late-layer focus)
+            device='auto'
+        )
+
+    @classmethod
+    def from_preset(cls, preset: Literal['local', 'remote', 'tiny', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'pythia_test_layers', 'qwen3_4b', 'qwen3_4b_test_layers']) -> 'QuantumConfig':
         """
         Create config from preset name
 
@@ -346,6 +368,7 @@ class QuantumConfig:
             'pythia_410m': cls.pythia_410m,
             'pythia_test_layers': cls.pythia_test_layers,
             'qwen3_4b': cls.qwen3_4b,
+            'qwen3_4b_test_layers': cls.qwen3_4b_test_layers,
         }
 
         if preset in preset_map:
