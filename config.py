@@ -226,8 +226,8 @@ class QuantumConfig:
             epochs=50,
             batch_size=5,
             num_prompts=20,
-            target_layer=18,  # Default if test_layers not specified
-            test_layers=[6, 12, 18, 24, 30],  # Test at 17%, 33%, 50%, 67%, 83% depth
+            target_layer=31,  # Default if test_layers not specified (86% depth)
+            test_layers=[25, 27, 29, 31, 33, 35],  # Test at 69%, 75%, 81%, 86%, 92%, 97% depth (late-layer focus)
             device='auto'  # Auto-detect GPU, fallback to CPU
         )
 
