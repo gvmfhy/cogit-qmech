@@ -56,7 +56,10 @@ class QuantumInterventionSystem:
     def load_gpt2(self):
         """Load language model from config"""
         print(f"\n[Loading {self.config.model_name}]")
-        self.adapter = TransformerLensAdapter(self.config.model_name, "cpu")
+        # Use CUDA if available, otherwise CPU (fixes GPU utilization bug)
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.adapter = TransformerLensAdapter(self.config.model_name, device)
         print(f"✓ {self.config.model_name} loaded")
 
     def load_encoder(self):
@@ -89,7 +92,10 @@ class QuantumInterventionSystem:
                 "Operator U_pos→neg not found! Run Phase 2 first."
             )
 
-        checkpoint_pos_neg = torch.load(pos_neg_file, map_location='cpu')
+        # Load to same device as model
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        checkpoint_pos_neg = torch.load(pos_neg_file, map_location=device)
         quantum_dim = checkpoint_pos_neg['config']['quantum_dim']
 
         self.operator_pos_to_neg = UnitaryOperator(quantum_dim=quantum_dim)
@@ -105,7 +111,7 @@ class QuantumInterventionSystem:
                 "Operator U_neg→pos not found! Run Phase 2 first."
             )
 
-        checkpoint_neg_pos = torch.load(neg_pos_file, map_location='cpu')
+        checkpoint_neg_pos = torch.load(neg_pos_file, map_location=device)
 
         self.operator_neg_to_pos = UnitaryOperator(quantum_dim=quantum_dim)
         self.operator_neg_to_pos.load_state_dict(checkpoint_neg_pos['model_state_dict'])
