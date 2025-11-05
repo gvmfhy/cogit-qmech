@@ -1,6 +1,6 @@
 # Cogit-QMech: Quantum Cognitive Operators
 
-A quantum-mechanically rigorous framework for manipulating cognitive states in neural networks using **unitary transformations** and **Born rule probabilities**.
+A quant-esque framework for manipulating cognitive states in neural networks using **unitary transformations** and **Born rule probabilities**.
 
 ## Motivation
 
