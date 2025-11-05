@@ -92,15 +92,15 @@ class QuantumInterventionSystem:
                 "Operator U_pos→neg not found! Run Phase 2 first."
             )
 
-        # Load to same device as model
+        # Load operators to CPU (7B model takes all GPU memory)
         import torch
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        checkpoint_pos_neg = torch.load(pos_neg_file, map_location=device)
+        checkpoint_pos_neg = torch.load(pos_neg_file, map_location='cpu')
         quantum_dim = checkpoint_pos_neg['config']['quantum_dim']
 
         self.operator_pos_to_neg = UnitaryOperator(quantum_dim=quantum_dim)
         self.operator_pos_to_neg.load_state_dict(checkpoint_pos_neg['model_state_dict'])
-        self.operator_pos_to_neg.to(device)  # Move operator to GPU
+        # Keep on CPU - too large for GPU alongside 7B model
         self.operator_pos_to_neg.eval()
 
         print(f"✓ Loaded U_pos→neg ({quantum_dim:,}-d)")
@@ -112,11 +112,11 @@ class QuantumInterventionSystem:
                 "Operator U_neg→pos not found! Run Phase 2 first."
             )
 
-        checkpoint_neg_pos = torch.load(neg_pos_file, map_location=device)
+        checkpoint_neg_pos = torch.load(neg_pos_file, map_location='cpu')
 
         self.operator_neg_to_pos = UnitaryOperator(quantum_dim=quantum_dim)
         self.operator_neg_to_pos.load_state_dict(checkpoint_neg_pos['model_state_dict'])
-        self.operator_neg_to_pos.to(device)  # Move operator to GPU
+        # Keep on CPU - too large for GPU alongside 7B model
         self.operator_neg_to_pos.eval()
 
         print(f"✓ Loaded U_neg→pos ({quantum_dim:,}-d)")
@@ -174,11 +174,11 @@ class QuantumInterventionSystem:
         def quantum_intervention(activations, hook):
             """Apply quantum operator to activations"""
 
-            # 1. Encode activation to quantum state
+            # 1. Encode activation to quantum state (keep on CPU for operator)
             quantum_state = self.encoder.encode_activation(activations.cpu().numpy())
-            quantum_state = quantum_state.to(activations.device)
+            # Keep on CPU - operator is on CPU due to GPU memory constraints
 
-            # 2. Apply unitary operator
+            # 2. Apply unitary operator (on CPU)
             with torch.no_grad():
                 transformed_state = operator(quantum_state)
 
