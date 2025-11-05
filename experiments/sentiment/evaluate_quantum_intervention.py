@@ -6,11 +6,18 @@ Runs baseline vs learned operators across a prompt set, logging sentiment
 shift (SiEBERT) and perplexity (model NLL) for quick iteration on a single GPU.
 """
 
+import sys
+from pathlib import Path
+
+# Add project root to path
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import argparse
 import json
 from dataclasses import asdict
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -19,9 +26,6 @@ from transformers import pipeline
 
 from config import QuantumConfig
 from experiments.sentiment.quantum_phase3_test import QuantumInterventionSystem
-
-
-ROOT = Path(__file__).resolve().parents[2]
 PROMPT_FILE = ROOT / "prompts" / "diverse_prompts_50.json"
 RESULTS_DIR = ROOT / "results" / "quantum_intervention"
 

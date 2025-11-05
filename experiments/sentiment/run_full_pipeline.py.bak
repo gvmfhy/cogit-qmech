@@ -34,13 +34,12 @@ from config import QuantumConfig
 class PipelineRunner:
     """Orchestrate full experimental pipeline with validation"""
 
-    def __init__(self, preset: str, auto_yes: bool = False):
+    def __init__(self, preset: str):
         self.preset = preset
         self.config = QuantumConfig.from_preset(preset)
         self.start_time = time.time()
         self.phase_times = {}
         self.results = {}
-        self.auto_yes = auto_yes
 
         print("\n" + "=" * 70)
         print(f"COGIT-QMECH FULL PIPELINE: {preset.upper()}")
@@ -70,11 +69,7 @@ class PipelineRunner:
         if age_minutes > 60:
             print(f"  ⚠️  Data is older than 1 hour (may be stale)")
 
-        # Auto-yes mode or prompt user
-        if self.auto_yes:
-            print(f"\n[Auto-yes mode] Reusing existing Phase 1 data")
-            return True
-
+        # Prompt user
         response = input(f"\nReuse existing Phase 1 data? [Y/n]: ")
         return response.lower() != 'n'
 
@@ -233,14 +228,14 @@ class PipelineRunner:
         if not self.validate_phase2():
             return False
 
-        # Phase 3: Generate Text Samples (qualitative inspection)
-        if not self.run_phase(3, "quantum_phase3_test.py", "Generate Text Samples"):
+        # Phase 3: Test Interventions
+        if not self.run_phase(3, "quantum_phase3_test.py", "Test Interventions"):
             return False
         if not self.validate_phase3():
             return False
 
-        # Phase 4: Evaluate Steering Effectiveness (quantitative metrics)
-        if not self.run_phase(4, "evaluate_quantum_intervention.py", "Evaluate Steering Effectiveness"):
+        # Phase 4: Test Reversibility
+        if not self.run_phase(4, "test_reversibility.py", "Test Reversibility"):
             return False
         if not self.validate_phase4():
             return False
@@ -280,18 +275,13 @@ def main():
         '--preset',
         type=str,
         required=True,
-        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'pythia_test_layers', 'qwen3_4b', 'qwen3_4b_test_layers'],
+        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_remote'],
         help='Configuration preset'
-    )
-    parser.add_argument(
-        '--yes', '-y',
-        action='store_true',
-        help='Automatically reuse existing Phase 1 data without prompting'
     )
 
     args = parser.parse_args()
 
-    runner = PipelineRunner(args.preset, auto_yes=args.yes)
+    runner = PipelineRunner(args.preset)
 
     success = runner.run_pipeline()
 

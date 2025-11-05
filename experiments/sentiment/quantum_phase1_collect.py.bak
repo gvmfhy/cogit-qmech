@@ -259,172 +259,12 @@ class QuantumDataCollector:
 
         return output_file
 
-    def save_quantum_data_with_layer(
-        self,
-        positive_quantum: List[torch.Tensor],
-        negative_quantum: List[torch.Tensor],
-        stats: dict,
-        layer_idx: int
-    ) -> Path:
-        """Save quantum states with layer identifier in filename"""
-
-        # Create output directory
-        output_dir = ROOT / self.config.data_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        # Prepare data for saving
-        data = {
-            'positive_quantum_states': [
-                {
-                    'real': state.real.tolist(),
-                    'imag': state.imag.tolist()
-                }
-                for state in positive_quantum
-            ],
-            'negative_quantum_states': [
-                {
-                    'real': state.real.tolist(),
-                    'imag': state.imag.tolist()
-                }
-                for state in negative_quantum
-            ],
-            'config': {
-                'model_name': self.config.model_name,
-                'model_identifier': self.config.model_identifier,
-                'quantum_dim': self.config.quantum_dim,
-                'input_dim': self.config.input_dim,
-                'num_states': len(positive_quantum),
-                'target_layer': layer_idx,  # Use the specific layer
-                'seed': self.config.seed
-            },
-            'separation_stats': stats,
-            'timestamp': timestamp
-        }
-
-        # Include layer in filename
-        model_id = self.config.model_identifier
-        output_file = output_dir / f"quantum_states_{model_id}_layer{layer_idx}_{self.config.quantum_dim}d_{timestamp}.json"
-
-        print(f"\n[Saving Quantum Data for Layer {layer_idx}]")
-
-        with open(output_file, 'w') as f:
-            json.dump(data, f)
-
-        print(f"✓ Saved to {output_file.name}")
-
-        # Save encoder projection for this layer
-        projection_file = output_dir / f"encoder_projection_{model_id}_layer{layer_idx}_{self.config.quantum_dim}d_{timestamp}.pt"
-        self.encoder.save_projection_matrix(projection_file)
-
-        return output_file
-
 
 def run_phase1(preset: str = 'local'):
     """Run Phase 1 data collection"""
 
     # Load configuration
     config = QuantumConfig.from_preset(preset)
-
-    # Check if this is a layer sweep
-    if hasattr(config, 'test_layers') and config.test_layers is not None:
-        return run_layer_sweep(config, preset)
-    else:
-        return run_single_layer(config, preset)
-
-
-def run_layer_sweep(config: QuantumConfig, preset: str):
-    """Run Phase 1 for multiple layers to find optimal separation"""
-
-    print("\n" + "=" * 70)
-    print("LAYER SWEEP MODE")
-    print("=" * 70)
-    print(f"\nTesting layers: {config.test_layers}")
-    print(f"This will help identify which layer has best pos/neg separation\n")
-
-    layer_results = []
-
-    for layer_idx in config.test_layers:
-        print("\n" + "=" * 70)
-        print(f"TESTING LAYER {layer_idx}")
-        print("=" * 70)
-
-        # Create a temporary config with this specific layer
-        layer_config = QuantumConfig.from_preset(preset)
-        layer_config.target_layer = layer_idx
-
-        # Create collector for this layer
-        collector = QuantumDataCollector(layer_config)
-
-        # Collect activations at this layer
-        pos_acts, neg_acts = collector.collect_activations()
-
-        # Encode to quantum states
-        pos_quantum, neg_quantum, stats = collector.encode_to_quantum_states(pos_acts, neg_acts)
-
-        # Save with layer identifier
-        output_file = collector.save_quantum_data_with_layer(
-            pos_quantum, neg_quantum, stats, layer_idx
-        )
-
-        # Store results
-        layer_results.append({
-            'layer': layer_idx,
-            'stats': stats,
-            'output_file': output_file
-        })
-
-        print(f"\n✅ Layer {layer_idx} complete")
-        print(f"   Centroid fidelity: {stats['centroid_fidelity']:.6f}")
-        print(f"   Separation gap: {stats['separation_gap']:.6f}")
-
-    # Print summary comparison
-    print("\n" + "=" * 70)
-    print("LAYER SWEEP SUMMARY")
-    print("=" * 70)
-    print(f"\n{'Layer':<8} {'Centroid Fidelity':<20} {'Separation Gap':<20} {'Quality'}")
-    print("-" * 70)
-
-    for result in layer_results:
-        layer = result['layer']
-        centroid_fid = result['stats']['centroid_fidelity']
-        sep_gap = result['stats']['separation_gap']
-
-        # Quality assessment
-        if sep_gap > 0.05:
-            quality = "✅ EXCELLENT"
-        elif sep_gap > 0.02:
-            quality = "✅ GOOD"
-        elif sep_gap > 0.01:
-            quality = "⚠️  MODERATE"
-        else:
-            quality = "❌ POOR"
-
-        print(f"{layer:<8} {centroid_fid:<20.6f} {sep_gap:<20.6f} {quality}")
-
-    # Find best layer
-    best_result = min(layer_results, key=lambda r: r['stats']['centroid_fidelity'])
-    best_layer = best_result['layer']
-    best_gap = best_result['stats']['separation_gap']
-
-    print("\n" + "=" * 70)
-    print(f"🎯 BEST LAYER: {best_layer}")
-    print(f"   Separation gap: {best_gap:.6f}")
-    print("=" * 70)
-
-    print(f"\nNext Steps:")
-    print(f"  1. Use layer {best_layer} for training (update config.target_layer)")
-    print(f"  2. Run Phase 2: python experiments/sentiment/quantum_phase2_train.py --preset {preset}")
-    print(f"  3. If all layers show poor separation (<1%), consider:")
-    print(f"     - Testing a classical additive steering baseline")
-    print(f"     - Using a different model or prompts")
-
-    return best_result['output_file']
-
-
-def run_single_layer(config: QuantumConfig, preset: str):
-    """Run Phase 1 for a single layer (original behavior)"""
 
     # Create collector
     collector = QuantumDataCollector(config)
@@ -461,7 +301,7 @@ def main():
         '--preset',
         type=str,
         default='local',
-        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'pythia_test_layers', 'qwen3_4b', 'qwen3_4b_test_layers'],
+        choices=['tiny', 'local', 'remote', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'qwen3_4b'],
         help='Configuration preset (tiny/local/remote for GPT-2 124M, qwen_tiny/qwen_local for Qwen2.5-3B, qwen_remote for Qwen2.5-7B)'
     )
 
