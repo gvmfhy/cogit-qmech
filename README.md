@@ -50,6 +50,19 @@ Training uses quantum fidelity instead of classical similarity:
    - Stronger sentiment shifts at lower blend ratios?
    - Better text coherence during intervention?
 
+## Important: Layer Selection
+
+**⚠️ Layer selection is critical for quantum steering success.**
+
+Before training on a new model, always run a layer sweep to find optimal sentiment separation. See **[docs/LAYER_SELECTION.md](docs/LAYER_SELECTION.md)** for detailed analysis showing:
+
+- **Wrong layer = zero steering** regardless of operator quality
+- Pythia-410M layer 12: 0.40% separation → steering failed
+- Pythia-410M layer 22: 5.41% separation → 13.5x improvement
+- Sentiment separation emerges in late layers (85-95% depth), not middle layers
+
+The separation gap metric (`within-class fidelity - cross-class fidelity`) quantitatively predicts steering success before training.
+
 ## Repository Structure
 
 ```
@@ -62,10 +75,12 @@ cogit-qmech/
 │   └── model_adapter_tl.py     # TransformerLens adapter (from classical)
 ├── experiments/
 │   └── sentiment/
-│       ├── quantum_phase1_collect.py    # Collect complex cogits
+│       ├── quantum_phase1_collect.py    # Collect complex cogits (with layer sweep)
 │       ├── quantum_phase2_train.py      # Train unitary operators
 │       ├── quantum_phase3_test.py       # Test interventions
 │       └── test_reversibility.py        # Validate round-trip fidelity
+├── docs/
+│   └── LAYER_SELECTION.md               # Critical guide for choosing optimal layers
 ├── analysis/
 │   ├── quantum_vs_classical.py          # Compare frameworks
 │   └── visualize_quantum.py             # Plot complex amplitudes
