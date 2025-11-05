@@ -264,6 +264,8 @@ class QuantumConfig:
         Memory estimate: ~2GB peak
         Training time: ~2-3 min
         Phase 3: ~2 min for full U-curve
+
+        Layer 22 selected via layer sweep (5.41% separation gap vs 0.40% at layer 12)
         """
         return cls(
             model_name="EleutherAI/pythia-410m",
@@ -273,7 +275,7 @@ class QuantumConfig:
             epochs=100,
             batch_size=12,
             num_prompts=50,
-            target_layer=12,  # 50% depth (24 layers)
+            target_layer=22,  # 92% depth - best separation from layer sweep
             device='auto'
         )
 
