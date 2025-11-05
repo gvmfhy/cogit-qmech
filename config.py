@@ -255,12 +255,59 @@ class QuantumConfig:
         )
 
     @classmethod
-    def from_preset(cls, preset: Literal['local', 'remote', 'tiny', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote']) -> 'QuantumConfig':
+    def pythia_410m(cls) -> 'QuantumConfig':
+        """
+        Preset for Pythia-410M (fast smoke testing)
+
+        Model: 410M params, 1024-d hidden, 24 layers
+        Quantum: 2666-d (proportional to GPT-2 ratio: 1024 * 2.604)
+        Memory estimate: ~2GB peak
+        Training time: ~2-3 min
+        Phase 3: ~2 min for full U-curve
+        """
+        return cls(
+            model_name="EleutherAI/pythia-410m",
+            input_dim=1024,
+            quantum_dim=2666,
+            learning_rate=0.001,
+            epochs=100,
+            batch_size=12,
+            num_prompts=50,
+            target_layer=12,  # 50% depth (24 layers)
+            device='auto'
+        )
+
+    @classmethod
+    def qwen3_4b(cls) -> 'QuantumConfig':
+        """
+        Qwen3-4B (April 2025 SOTA, optimal for quantum steering)
+
+        Model: 4B params, 2560-d hidden, ~36 layers (estimated)
+        Quantum: 6666-d (2560 * 2.604)
+        Memory estimate: ~15GB peak
+        Training time: ~5 min
+        Phase 3: ~4 min for full U-curve
+        Sweet spot: Fast iteration, rich semantics, proven scale
+        """
+        return cls(
+            model_name="Qwen/Qwen3-4B",
+            input_dim=2560,
+            quantum_dim=6666,
+            learning_rate=0.001,
+            epochs=100,
+            batch_size=12,
+            num_prompts=50,
+            target_layer=18,  # ~50% depth
+            device='auto'
+        )
+
+    @classmethod
+    def from_preset(cls, preset: Literal['local', 'remote', 'tiny', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'qwen3_4b']) -> 'QuantumConfig':
         """
         Create config from preset name
 
         Args:
-            preset: One of 'local', 'remote', 'tiny', 'qwen_local', 'qwen_tiny', 'qwen_test_layers'
+            preset: One of 'local', 'remote', 'tiny', 'qwen_local', 'qwen_tiny', 'qwen_test_layers', 'qwen_remote', 'pythia_410m', 'qwen3_4b'
 
         Returns:
             QuantumConfig instance
@@ -273,6 +320,8 @@ class QuantumConfig:
             'qwen_tiny': cls.qwen_tiny,
             'qwen_test_layers': cls.qwen_test_layers,
             'qwen_remote': cls.qwen_remote,
+            'pythia_410m': cls.pythia_410m,
+            'qwen3_4b': cls.qwen3_4b,
         }
 
         if preset in preset_map:
