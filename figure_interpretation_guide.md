@@ -1,5 +1,10 @@
 # Publication Figure Interpretation Guide
 
+**⚠️ CAUTION: Generated 2025-11-05 at 4:30 AM**
+These visualizations have not been thoroughly checked. View with caution and verify all claims against raw data before use in publications or presentations.
+
+---
+
 This guide explains how to read each figure and what patterns indicate success vs failure.
 
 ---
