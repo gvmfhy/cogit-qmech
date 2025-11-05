@@ -200,6 +200,10 @@ class QuantumStateEncoder:
                 f = quantum_fidelity(positive_states_device[i], negative_states_device[j])
                 cross_fidelities.append(f.item())
 
+        # Calculate separation gap (within-class minus cross-class)
+        avg_within_class = (np.mean(pos_fidelities) + np.mean(neg_fidelities)) / 2
+        separation_gap = avg_within_class - np.mean(cross_fidelities)
+
         stats = {
             'centroid_fidelity': centroid_fidelity.item(),
             'centroid_cosine_similarity': cosine_sim.item(),
@@ -208,7 +212,8 @@ class QuantumStateEncoder:
             'neg_class_consistency': np.mean(neg_fidelities),
             'neg_class_std': np.std(neg_fidelities),
             'cross_class_fidelity': np.mean(cross_fidelities),
-            'cross_class_std': np.std(cross_fidelities)
+            'cross_class_std': np.std(cross_fidelities),
+            'separation_gap': separation_gap
         }
 
         print(f"    Centroid fidelity: {stats['centroid_fidelity']:.4f}")
@@ -218,6 +223,8 @@ class QuantumStateEncoder:
         print(f"    Negative class consistency: {stats['neg_class_consistency']:.4f} ± {stats['neg_class_std']:.4f}")
         print(f"    Cross-class fidelity: {stats['cross_class_fidelity']:.4f} ± {stats['cross_class_std']:.4f}")
         print(f"      (Should be lower than within-class)")
+        print(f"    Separation gap: {stats['separation_gap']:.4f}")
+        print(f"      (Higher is better: within-class - cross-class)")
 
         return stats
 
