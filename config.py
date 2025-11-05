@@ -129,7 +129,7 @@ class QuantumConfig:
             learning_rate=0.001,
             epochs=100,
             batch_size=10,
-            device='cpu'  # MPS doesn't support complex numbers
+            device='auto'  # Auto-detect GPU, fallback to CPU (MPS not supported)
         )
 
     @classmethod
@@ -145,7 +145,7 @@ class QuantumConfig:
             learning_rate=0.0005,
             epochs=150,
             batch_size=20,
-            device='cuda'
+            device='auto'  # Auto-detect GPU, fallback to CPU
         )
 
     @classmethod
@@ -165,7 +165,7 @@ class QuantumConfig:
             batch_size=5,
             num_prompts=10,  # Only 10 prompts per class
             target_layer=6,
-            device='cpu'
+            device='auto'  # Auto-detect GPU, fallback to CPU
         )
 
     @classmethod
@@ -187,7 +187,7 @@ class QuantumConfig:
             batch_size=10,
             num_prompts=50,
             target_layer=18,  # ~50% depth for richer semantics
-            device='cpu'  # MPS doesn't support complex numbers
+            device='auto'  # Auto-detect GPU, fallback to CPU
         )
 
     @classmethod
@@ -207,7 +207,7 @@ class QuantumConfig:
             batch_size=5,
             num_prompts=10,
             target_layer=18,
-            device='cpu'
+            device='auto'  # Auto-detect GPU, fallback to CPU
         )
 
     @classmethod
@@ -228,7 +228,7 @@ class QuantumConfig:
             num_prompts=20,
             target_layer=18,  # Default if test_layers not specified
             test_layers=[6, 12, 18, 24, 30],  # Test at 17%, 33%, 50%, 67%, 83% depth
-            device='cpu'
+            device='auto'  # Auto-detect GPU, fallback to CPU
         )
 
     @classmethod
@@ -251,7 +251,7 @@ class QuantumConfig:
             batch_size=16,
             num_prompts=50,
             target_layer=14,  # ~50% depth (28 layers total)
-            device='cuda'
+            device='auto'  # Auto-detect GPU, fallback to CPU if needed
         )
 
     @classmethod
